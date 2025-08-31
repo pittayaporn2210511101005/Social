@@ -1,7 +1,11 @@
 import React from 'react'
 import './Pageone.css'
 
-function Pageone() {
+function Pageone({ onLogin }) {
+    const handleSubmit = (e) => {
+    e.preventDefault() // กัน refresh หน้า
+    onLogin()  // เรียกฟังก์ชันที่ส่งมาจาก App เพื่อเปลี่ยนไปหน้า Homepage
+  }
   return (
     <>
     {/* วงกลม 4 มุม */}
@@ -17,15 +21,16 @@ function Pageone() {
              <span className="social-text">Social</span>
              </div>
     
-    <form className='login-form'>
-        <div className='form-group'>
-          <input
+    <form className='login-form' onSubmit={handleSubmit}>
+          <div className='form-group'>  
+            <input
                 type='text'
                 id = "Username"
                 placeholder="Username / Email"
                 className='form-control'
                 />
         </div>
+
     
     <div className='form-group'>
          <input 
