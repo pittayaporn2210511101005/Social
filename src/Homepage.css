@@ -176,3 +176,8 @@ html, body ,#root{
     align-items: baseline;
     justify-content: space-between;
   }
+
+@keyframes shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}

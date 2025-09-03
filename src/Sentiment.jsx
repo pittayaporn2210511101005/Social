@@ -3,12 +3,10 @@ import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Homepage.css";
 
-// โหลดผ่าน service + hook (จะลอง API จริงก่อน ถ้าไม่ติดจะ fallback mock)
+// services + hook (จะลอง API จริงก่อน ถ้าไม่ติดจะ fallback mock)
 import { getSentimentByFaculty, getMentions } from "./services/api";
 import { useFetch } from "./hooks/useFetch";
-
-// ★ เพิ่ม import ของ Recharts (สำหรับ PieChart)
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import Skeleton from "./components/Skeleton";
 
 function Sentiment() {
     // ---------- ฟิลเตอร์ ----------
@@ -24,7 +22,7 @@ function Sentiment() {
         err: errFac,
     } = useFetch(() => getSentimentByFaculty(), []);
 
-    // รายชื่อคณะ (ถ้า API มี ใช้อันนั้น, ไม่งั้นใช้ fallback)
+    // รายชื่อคณะ (ถ้า API มี ใช้อันนั้น, ไม่งั้น fallback)
     const faculties = useMemo(() => {
         const list = byFaculty?.map((f) => f.name).filter(Boolean) || [];
         return ["ทั้งหมด", ...list];
@@ -86,9 +84,6 @@ function Sentiment() {
                     : "badge badge-neu";
         return <span className={cls}>{label}</span>;
     };
-
-    // ใช้สถานะโหลดรวมสำหรับกราฟ
-    const loadingAny = loadingFac || loadingMentions;
 
     return (
         <div className="homepage-container">
@@ -249,6 +244,7 @@ function Sentiment() {
                             )}
                         </div>
                     </div>
+
                     <div className="metric-card">
                         <div className="metric-header">
                             <span className="metric-title">Positive / Neutral / Negative</span>
@@ -265,109 +261,18 @@ function Sentiment() {
                     </div>
                 </section>
 
-                {/* ★★★ Sentiment Overview (PieChart) ★★★ */}
-                <section className="widget-card" style={{ marginBottom: 16 }}>
-                    <h3 className="widget-title">Sentiment Overview</h3>
-                    {loadingAny ? (
-                        <div className="chart-placeholder">กำลังโหลด…</div>
-                    ) : totals.total === 0 ? (
-                        <div className="chart-placeholder">ไม่มีข้อมูล</div>
-                    ) : (
-                        <>
-                            <div
-                                style={{
-                                    height: 260,
-                                    background: "var(--light-bg)",
-                                    borderRadius: 10,
-                                    padding: 10,
-                                }}
-                            >
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={[
-                                                { name: "Positive", value: totals.positive || 0 },
-                                                { name: "Neutral", value: totals.neutral || 0 },
-                                                { name: "Negative", value: totals.negative || 0 },
-                                            ]}
-                                            dataKey="value"
-                                            nameKey="name"
-                                            innerRadius={60}
-                                            outerRadius={90}
-                                            paddingAngle={2}
-                                        >
-                                            <Cell fill="#2e7d32" /> {/* positive */}
-                                            <Cell fill="#f9a825" /> {/* neutral */}
-                                            <Cell fill="#c62828" /> {/* negative */}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-
-                            {/* ตัวเลขสรุปใต้กราฟ */}
-                            <div
-                                style={{
-                                    marginTop: 10,
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(3, 1fr)",
-                                    gap: 10,
-                                    fontSize: 14,
-                                }}
-                            >
-                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span
-                      style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 2,
-                          background: "#2e7d32",
-                      }}
-                  ></span>
-                                    <span>Positive</span>
-                                    <b>{totals.positive ?? 0}</b>
-                                </div>
-                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span
-                      style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 2,
-                          background: "#f9a825",
-                      }}
-                  ></span>
-                                    <span>Neutral</span>
-                                    <b>{totals.neutral ?? 0}</b>
-                                </div>
-                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span
-                      style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 2,
-                          background: "#c62828",
-                      }}
-                  ></span>
-                                    <span>Negative</span>
-                                    <b>{totals.negative ?? 0}</b>
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </section>
-
                 {/* สัดส่วนตามคณะ */}
                 <section className="widget-card" style={{ marginBottom: 16 }}>
                     <h3 className="widget-title">สัดส่วน Sentiment ตามคณะ</h3>
-                    <div className="chart-placeholder" style={{ padding: 16 }}>
-                        {errFac ? (
-                            <div style={{ color: "#c62828" }}>
-                                โหลดข้อมูลไม่สำเร็จ: {String(errFac)}
-                            </div>
-                        ) : loadingFac ? (
-                            "กำลังโหลด…"
-                        ) : byFaculty && byFaculty.length > 0 ? (
-                            byFaculty.map((f) => {
+                    {loadingFac ? (
+                        <Skeleton height={180} />
+                    ) : errFac ? (
+                        <div className="chart-placeholder" style={{ color: "#c62828" }}>
+                            โหลดข้อมูลไม่สำเร็จ: {String(errFac)}
+                        </div>
+                    ) : byFaculty && byFaculty.length > 0 ? (
+                        <div className="chart-placeholder" style={{ padding: 16 }}>
+                            {byFaculty.map((f) => {
                                 const total = (f.pos || 0) + (f.neu || 0) + (f.neg || 0) || 1;
                                 const posW = Math.round(((f.pos || 0) / total) * 100);
                                 const neuW = Math.round(((f.neu || 0) / total) * 100);
@@ -413,11 +318,11 @@ function Sentiment() {
                                         </div>
                                     </div>
                                 );
-                            })
-                        ) : (
-                            "ไม่มีข้อมูล"
-                        )}
-                    </div>
+                            })}
+                        </div>
+                    ) : (
+                        <div className="chart-placeholder">ไม่มีข้อมูล</div>
+                    )}
                 </section>
 
                 {/* ตารางรายการ */}
@@ -429,7 +334,11 @@ function Sentiment() {
                         </div>
                     )}
                     {loadingMentions ? (
-                        <div className="chart-placeholder">กำลังโหลด…</div>
+                        <div style={{ display: "grid", gap: 12 }}>
+                            <Skeleton height={28} />
+                            <Skeleton height={120} />
+                            <Skeleton height={18} />
+                        </div>
                     ) : (
                         <div className="table">
                             <div className="t-head">

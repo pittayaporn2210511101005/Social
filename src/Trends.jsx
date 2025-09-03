@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import "./Homepage.css"; // ใช้โทนเดียวกับหน้าโฮม
 import { getTrends } from "./services/api";
 import { useFetch } from "./hooks/useFetch";
+import Skeleton from "./components/Skeleton";
 import {
     LineChart,
     Line,
@@ -14,7 +15,7 @@ import {
 } from "recharts";
 
 function Trends() {
-    // โหลดข้อมูล Trends (keywords + posts [+ trend ถ้ามี]) ผ่าน service
+    // โหลดข้อมูล Trends (keywords + posts + trend) ผ่าน service
     const { data, loading, err } = useFetch(() => getTrends(), []);
     const keywords = data?.keywords ?? [];
     const posts = data?.posts ?? [];
@@ -91,8 +92,12 @@ function Trends() {
                     {/* Top Keywords */}
                     <div className="widget-card">
                         <h3 className="widget-title">Top Keywords</h3>
-                        {loading ? (
-                            <div className="chart-placeholder">กำลังโหลด…</div>
+                        {err ? (
+                            <div className="chart-placeholder" style={{ color: "#c62828" }}>
+                                โหลดข้อมูลไม่สำเร็จ
+                            </div>
+                        ) : loading ? (
+                            <Skeleton height={200} />
                         ) : keywords.length === 0 ? (
                             <div className="chart-placeholder">ไม่มีข้อมูล</div>
                         ) : (
@@ -124,7 +129,7 @@ function Trends() {
                     <div className="widget-card">
                         <h3 className="widget-title">Mentions Trend</h3>
                         {loading ? (
-                            <div className="chart-placeholder">กำลังโหลด…</div>
+                            <Skeleton height={220} />
                         ) : trend.length === 0 ? (
                             <div className="chart-placeholder">ไม่มีข้อมูล trend</div>
                         ) : (
@@ -157,7 +162,11 @@ function Trends() {
                     <div className="widget-card" style={{ gridColumn: "span 2" }}>
                         <h3 className="widget-title">Trending Posts</h3>
                         {loading ? (
-                            <div className="chart-placeholder">กำลังโหลด…</div>
+                            <div style={{ display: "grid", gap: 12 }}>
+                                <Skeleton height={28} />
+                                <Skeleton height={120} />
+                                <Skeleton height={18} />
+                            </div>
                         ) : posts.length === 0 ? (
                             <div className="chart-placeholder">ไม่มีข้อมูล</div>
                         ) : (
