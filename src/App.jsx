@@ -1,24 +1,74 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import Pageone from './Pageone'
-import Homepage from './Homepage'
-import Dashboard from './Dashboard'
+// src/App.jsx
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+import Homepage from "./Homepage";
+import Dashboard from "./Dashboard";
+import Sentiment from "./Sentiment";
+import Trends from "./Trends";
+import Settings from "./Settings";
+import Pageone from "./Pageone";
 
-
-function App() {
-  
-const [isLoggedIn, setIsLoggedIn] = useState(false)/*เก็บสถานะว่าล็อกอินแล้วหรือยัง*/
-
-  return (
-    <>
-       {isLoggedIn ? (
-        <Homepage />
-      ) : (
-        <Pageone onLogin={() => setIsLoggedIn(true)} />
-      )}
-    </>
-  )
+function RequireAuth({ isLoggedIn, children }) {
+  return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
-export default App
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  return (
+      <Router>
+        <Routes>
+          {/* เริ่มที่ login */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+
+          <Route path="/login" element={
+            <Pageone onLogin={() => setIsLoggedIn(true)} />
+          } />
+
+          <Route
+              path="/mentions"
+              element={
+                <RequireAuth isLoggedIn={isLoggedIn}>
+                  <Homepage />
+                </RequireAuth>
+              }
+          />
+          <Route
+              path="/dashboard"
+              element={
+                <RequireAuth isLoggedIn={isLoggedIn}>
+                  <Dashboard />
+                </RequireAuth>
+              }
+          />
+          <Route
+              path="/sentiment"
+              element={
+                <RequireAuth isLoggedIn={isLoggedIn}>
+                  <Sentiment />
+                </RequireAuth>
+              }
+          />
+          <Route
+              path="/trends"
+              element={
+                <RequireAuth isLoggedIn={isLoggedIn}>
+                  <Trends />
+                </RequireAuth>
+              }
+          />
+          <Route
+              path="/settings"
+              element={
+                <RequireAuth isLoggedIn={isLoggedIn}>
+                  <Settings />
+                </RequireAuth>
+              }
+          />
+
+          {/* กันกรณี path แปลก */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+  );
+}
