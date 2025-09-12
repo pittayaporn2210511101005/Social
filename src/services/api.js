@@ -11,6 +11,7 @@ async function safeFetch(primaryFn, mockUrl) {
     try {
         // ลองเรียก API จริงก่อน
         return await primaryFn();
+        // eslint-disable-next-line no-unused-vars
     } catch (_) {
         // ถ้า fail → ใช้ mock
         return await tryJson(mockUrl);
