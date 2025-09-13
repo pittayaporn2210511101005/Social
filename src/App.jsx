@@ -26,12 +26,13 @@ export default function App() {
           } />
 
           <Route
-              path="/mentions"
-              element={
-                <RequireAuth isLoggedIn={isLoggedIn}>
-                  <Homepage />
-                </RequireAuth>
-              }
+            path="/mentions"
+            element={
+              <RequireAuth isLoggedIn={isLoggedIn}>
+                {console.log("isLoggedIn:", isLoggedIn)} {/* ✅ debug */}
+                <Homepage />
+              </RequireAuth>
+            }
           />
           <Route
               path="/dashboard"
