@@ -1,12 +1,14 @@
 // src/Sentiment.jsx
+
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Homepage.css";
 
 // services + hook (จะลอง API จริงก่อน ถ้าไม่ติดจะ fallback mock)
-import { getSentimentByFaculty, getMentions } from "./services/api";
+import { getSentimentSummary } from './services/api';
 import { useFetch } from "./hooks/useFetch";
 import Skeleton from "./components/Skeleton";
+
 
 function Sentiment() {
     // ---------- ฟิลเตอร์ ----------
@@ -20,25 +22,31 @@ function Sentiment() {
         data: byFaculty,
         loading: loadingFac,
         err: errFac,
-    } = useFetch(() => getSentimentByFaculty(), []);
+    } = useFetch(() => getSentimentSummary(), []);
 
-    // รายชื่อคณะ (ถ้า API มี ใช้อันนั้น, ไม่งั้น fallback)
-    const faculties = useMemo(() => {
-        const list = byFaculty?.map((f) => f.name).filter(Boolean) || [];
-        return ["ทั้งหมด", ...list];
-    }, [byFaculty]);
 
-    // ---------- ดึงรายการ mentions (รองรับภายหลังเมื่อ API filter ได้) ----------
-    const qs = useMemo(() => {
-        const params = new URLSearchParams();
-        if (selectedSent !== "ทั้งหมด") params.set("sentiment", selectedSent);
-        if (selectedFaculty !== "ทั้งหมด") params.set("faculty", selectedFaculty);
-        if (dateFrom) params.set("from", dateFrom);
-        if (dateTo) params.set("to", dateTo);
-        params.set("limit", "20");
-        const s = params.toString();
-        return s ? `?${s}` : "";
-    }, [selectedSent, selectedFaculty, dateFrom, dateTo]);
+    // ---------- รายชื่อคณะ (ถ้า API มี ใช้อันนั้น, ไม่งั้น fallback) ----------
+const faculties = useMemo(() => {
+    if (Array.isArray(byFaculty)) {
+      const list = byFaculty.map((f) => f.name).filter(Boolean);
+      return ["ทั้งหมด", ...list];
+    }
+    // ถ้า API เป็น object เดี่ยว จะไม่มีรายชื่อคณะ
+    return ["ทั้งหมด"];
+  }, [byFaculty]);
+  
+  // ---------- ดึงรายการ mentions (รองรับภายหลังเมื่อ API filter ได้) ----------
+  const qs = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedSent !== "ทั้งหมด") params.set("sentiment", selectedSent);
+    if (selectedFaculty !== "ทั้งหมด") params.set("faculty", selectedFaculty);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
+    params.set("limit", "20");
+    const s = params.toString();
+    return s ? `?${s}` : "";
+  }, [selectedSent, selectedFaculty, dateFrom, dateTo]);
+  
 
     const {
         data: mentionsData,
@@ -48,19 +56,26 @@ function Sentiment() {
 
     const mentions = mentionsData?.items || mentionsData || [];
 
+    
+
     // ---------- สรุปด้านบน (total/pos/neu/neg) ----------
-    const totals = useMemo(() => {
-        if (byFaculty && Array.isArray(byFaculty) && byFaculty.length > 0) {
-            const pos = byFaculty.reduce((a, b) => a + (b.pos || 0), 0);
-            const neu = byFaculty.reduce((a, b) => a + (b.neu || 0), 0);
-            const neg = byFaculty.reduce((a, b) => a + (b.neg || 0), 0);
-            return { total: pos + neu + neg, positive: pos, neutral: neu, negative: neg };
-        }
-        const pos = mentions.filter((m) => m.sentiment === "positive").length;
-        const neu = mentions.filter((m) => m.sentiment === "neutral").length;
-        const neg = mentions.filter((m) => m.sentiment === "negative").length;
-        return { total: mentions.length, positive: pos, neutral: neu, negative: neg };
-    }, [byFaculty, mentions]);
+const totals = useMemo(() => {
+    if (byFaculty) {
+      // กรณี API ส่ง object เดียว
+      return {
+        total: (byFaculty.positive || 0) + (byFaculty.neutral || 0) + (byFaculty.negative || 0),
+        positive: byFaculty.positive || 0,
+        neutral: byFaculty.neutral || 0,
+        negative: byFaculty.negative || 0
+      }
+    }
+    const pos = mentions.filter((m) => m.sentiment === "positive").length;
+    const neu = mentions.filter((m) => m.sentiment === "neutral").length;
+    const neg = mentions.filter((m) => m.sentiment === "negative").length;
+    return { total: mentions.length, positive: pos, neutral: neu, negative: neg }
+  }, [byFaculty, mentions]);
+
+
 
     // ---------- กรองในฝั่งหน้า (ระหว่างรอ backend รองรับ params) ----------
     const filteredMentions = useMemo(() => {

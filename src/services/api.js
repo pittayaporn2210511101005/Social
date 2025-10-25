@@ -18,11 +18,11 @@ async function safeFetch(primaryFn, mockUrl) {
     }
 }
 
-/** SUMMARY */
-export function getSummary() {
+/** SENTIMENT SUMMARY */
+export function getSentimentSummary() {
     return safeFetch(
-        () => tryJson(`${BASE}/api/summary`),
-        "/mocks/summary.json"
+      () => tryJson("http://localhost:8082/sentiment/summary"),
+      "/mocks/sentiment_summary.json"
     );
 }
 
@@ -35,13 +35,7 @@ export function getMentions(qs = "") {
     );
 }
 
-/** SENTIMENT BY FACULTY */
-export function getSentimentByFaculty() {
-    return safeFetch(
-        () => tryJson(`${BASE}/api/sentiment/faculty`),
-        "/mocks/sentimentByFaculty.json"
-    );
-}
+
 
 /** TRENDS (keywords + posts) */
 export function getTrends() {

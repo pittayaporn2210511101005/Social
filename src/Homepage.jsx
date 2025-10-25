@@ -3,11 +3,12 @@ import React, { useMemo, useState } from "react";
 import "./Homepage.css";
 import { Link } from "react-router-dom";
 
-// services + hook (โหลดข้อมูลจาก API จริง ถ้าไม่พร้อมจะ fallback ไปที่ public/mocks)
+// services + hook
 import { getMentions, getMentionsTrend } from "./services/api";
 import { useFetch } from "./hooks/useFetch";
 
-// Recharts สำหรับกราฟเส้น
+// Recharts
+import { getSentimentSummary } from "./services/api";
 import {
     LineChart,
     Line,
@@ -15,6 +16,10 @@ import {
     YAxis,
     Tooltip,
     ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
+    Legend
 } from "recharts";
 
 function Homepage() {
@@ -55,22 +60,26 @@ function Homepage() {
         return `?${params.toString()}`;
     }, [page, pageSize, q, faculty, sent, from, to]);
 
-    // ดึงรายการ mentions (ตาราง)
+    // ---------- ดึงรายการ mentions (ตาราง) ----------
     const { data, loading, err } = useFetch(() => getMentions(qs), [qs]);
     const items = data?.items || [];
     const total = data?.total ?? items.length;
     const maxPage = Math.max(1, Math.ceil(total / pageSize));
 
-    // ดึงข้อมูล trend สำหรับกราฟเส้น
-    const {
-        data: trendData,
-        loading: loadingTrend,
-        err: errTrend,
-    } = useFetch(() => getMentionsTrend(), []);
-    const trend = (trendData?.points ?? []).map((d) => ({
-        date: d.date,
-        count: d.count,
-    }));
+    // ---------- ดึงข้อมูล trend สำหรับกราฟเส้น ----------
+    const { data: trendData, loading: loadingTrend, err: errTrend } = useFetch(() => getMentionsTrend(), []);
+    const trend = (trendData?.points ?? []).map((d) => ({ date: d.date, count: d.count }));
+
+    // ---------- Sentiment Overview Data ----------
+    const { data: sentimentSummary, loading: loadingSentiment, err: errSentiment } = useFetch(() => getSentimentSummary(), []);
+   // เตรียม data สำหรับ PieChart
+    const sentimentData = [
+        { name: "Positive", value: sentimentSummary?.positive || 0 },
+        { name: "Neutral", value: sentimentSummary?.neutral || 0 },
+        { name: "Negative", value: sentimentSummary?.negative || 0 },
+        ];
+  
+  const COLORS = ["#2E7D32", "#F9A825", "#C62828"]; // เขียว / เหลือง / แดง
 
     // ---------- Reset filters ----------
     const resetFilters = () => {
@@ -82,26 +91,6 @@ function Homepage() {
         setPage(1);
     };
 
-    // ---------- Export CSV (ส่งออกเฉพาะรายการที่กำลังแสดง) ----------
-    function downloadCSV(rows, filename = "mentions.csv") {
-        const headers = ["title", "faculty", "sentiment", "date", "url"];
-        const csv = [
-            headers.join(","),
-            ...rows.map((r) =>
-                headers
-                    .map((h) => `"${(r[h] ?? "").toString().replace(/"/g, '""')}"`)
-                    .join(",")
-            ),
-        ].join("\n");
-
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
 
     // ---------- Export CSV (ทั้งชุดตามฟิลเตอร์ปัจจุบัน) ----------
     async function exportAllCSV() {
@@ -309,7 +298,26 @@ function Homepage() {
                 <main className="widgets-grid">
                     <div className="widget-card widget-sentiment">
                         <h3 className="widget-title">Sentiment Overview</h3>
-                        <div className="chart-placeholder">ใส่วงกลมแนวโน้ม</div>
+                        <div style={{ width: "100%", height: 260 }}>
+                            <ResponsiveContainer>
+                                    <PieChart>
+                                        <Pie
+                                            data={sentimentData}
+                                            dataKey="value"
+                                            nameKey="name"
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={80}
+                                            label>
+                                            {sentimentData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Legend verticalAlign="bottom" height={36} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    </div>
+
                     </div>
 
                     {/* กราฟเส้น Mention Trends (Recharts) */}
@@ -333,16 +341,16 @@ function Homepage() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={trend}>
                                         <XAxis dataKey="date" />
-                                        <YAxis />
-                                        <Tooltip />
+                                        <YAxis tickFormatter={(val) => val} domain={[0, 'auto']} />
+                                        <Tooltip formatter={(value) => [`${value} mentions`, "Count"]} />
                                         <Line
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke="var(--primary-color)"
-                                            dot={false}
+                                        type="monotone"
+                                        dataKey="count"
+                                        stroke="#FF5722"
+                                        dot={{ r: 4, fill: "#FF5722" }}
                                         />
                                     </LineChart>
-                                </ResponsiveContainer>
+                                    </ResponsiveContainer>
                             </div>
                         )}
                     </div>

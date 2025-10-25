@@ -2,9 +2,11 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import "./Dashboard.css"; // โทนสีเดียวกับหน้าโฮม (อิงตัวแปร :root)
-import { getSummary, getMentions } from "./services/api";
+import { getSentimentSummary } from "./services/api";
 import { useFetch } from "./hooks/useFetch";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+
+
 
 
 function SentimentBadge({ label }) {
