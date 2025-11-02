@@ -1,28 +1,64 @@
 // src/Trends.jsx
-import React from "react";
+import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
-import "./Homepage.css"; // ใช้โทนเดียวกับหน้าโฮม
-import { getTrends } from "./services/api";
+// import "./Trends.css";               // ถ้าไม่มีไฟล์นี้ ให้ลบบรรทัด import ทิ้งได้
 import { useFetch } from "./hooks/useFetch";
-import Skeleton from "./components/Skeleton";
-import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    Tooltip,
-    ResponsiveContainer,
-} from "recharts";
+import { getTweetAnalysis } from "./services/api";
 
-function Trends() {
-    // โหลดข้อมูล Trends (keywords + posts + trend) ผ่าน service
-    const { data, loading, err } = useFetch(() => getTrends(), []);
-    const keywords = data?.keywords ?? [];
-    const posts = data?.posts ?? [];
-    const trend = (data?.trend ?? []).map((d) => ({ date: d.date, count: d.count }));
+/** พยายามแปลง topicsJson ให้เป็น array ถ้าเป็น text จะดึง #hashtag ออกมา */
+function toTopicsList(topicsJson) {
+    if (!topicsJson) return [];
+    // 1) ลอง parse เป็น JSON array ก่อน
+    try {
+        const js = JSON.parse(topicsJson);
+        if (Array.isArray(js)) return js.filter(Boolean).map(String);
+    } catch (_) {}
+    // 2) ถ้าไม่ใช่ JSON: ดึง hashtags จากสตริง
+    const tags = String(topicsJson).match(/#[\p{L}\d_]+/gu) || [];
+    return tags.map(t => t.trim());
+}
+
+export default function Trends() {
+    // ดึงข้อมูลจริงจากตาราง tweet_analysis
+    const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
+    const rows = data || [];
+
+    // สร้าง Top Keywords และลิสต์โพสต์ล่าสุด
+    const { topKeywords, trendingPosts } = useMemo(() => {
+        // --------- นับคีย์เวิร์ด/แฮชแท็ก ---------
+        const counter = new Map();
+        for (const r of rows) {
+            const topics = toTopicsList(r.topicsJson);
+            for (const tRaw of topics) {
+                const t = tRaw.toLowerCase();
+                counter.set(t, (counter.get(t) || 0) + 1);
+            }
+        }
+        const topKeywords = Array.from(counter.entries())
+            .map(([tag, count]) => ({ tag, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+        // --------- โพสต์มาแรง (ล่าสุด) ----------
+        const trendingPosts = [...rows]
+            .sort((a, b) =>
+                String(b.analyzedAt || "").localeCompare(String(a.analyzedAt || ""))
+            )
+            .slice(0, 5)
+            .map((r) => ({
+                id: r.id,
+                title:
+                    toTopicsList(r.topicsJson)[0] ||
+                    (r.faculty ? `โพสต์เกี่ยวกับ ${r.faculty}` : `Tweet ${r.tweetId}`),
+                date: r.analyzedAt ? String(r.analyzedAt).slice(0, 10) : "",
+                url: r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "#",
+            }));
+
+        return { topKeywords, trendingPosts };
+    }, [rows]);
 
     return (
-        <div className="homepage-container">
+        <div className="dashboard-container">
             {/* Sidebar */}
             <div className="sidebar">
                 <div className="logo-container">
@@ -37,53 +73,34 @@ function Trends() {
 
                 <nav className="nav-menu">
                     <Link to="/dashboard" className="nav-item">
-                        <i className="far fa-chart-line"></i>
-                        <span>Dashboard</span>
+                        <i className="far fa-chart-line"></i><span>Dashboard</span>
                     </Link>
                     <Link to="/mentions" className="nav-item">
-                        <i className="fas fa-comment-dots"></i>
-                        <span>Mentions</span>
+                        <i className="fas fa-comment-dots"></i><span>Mentions</span>
                     </Link>
                     <Link to="/sentiment" className="nav-item">
-                        <i className="fas fa-smile"></i>
-                        <span>Sentiment</span>
+                        <i className="fas fa-smile"></i><span>Sentiment</span>
                     </Link>
                     <Link to="/trends" className="nav-item active">
-                        <i className="fas fa-stream"></i>
-                        <span>Trends</span>
+                        <i className="fas fa-stream"></i><span>Trends</span>
                     </Link>
                     <Link to="/settings" className="nav-item">
-                        <i className="fas fa-cog"></i>
-                        <span>Settings</span>
+                        <i className="fas fa-cog"></i><span>Settings</span>
                     </Link>
                 </nav>
             </div>
 
-            {/* Main Content */}
+            {/* Main */}
             <div className="main-content">
                 <header className="main-header">
                     <div className="header-left">
                         <h1 className="header-title">Trends</h1>
-                        <div className="sub-note" style={{ color: "#666" }}>
-                            * ดึงจาก API ถ้ามี, ไม่งั้นใช้ mock (public/mocks/trends.json)
-                        </div>
-                    </div>
-                    <div className="header-right">
-                        <div className="search-bar">
-                            <i className="fas fa-search"></i>
-                            <input type="text" placeholder="Search trends" />
-                        </div>
-                        <div className="profile-icon">
-                            <i className="fas fa-user-circle"></i>
-                        </div>
+                        <div className="sub-note">* ดึงจากฐานข้อมูล tweet_analysis</div>
                     </div>
                 </header>
 
                 {err && (
-                    <div
-                        className="widget-card"
-                        style={{ border: "1px solid #f44336", color: "#c62828" }}
-                    >
+                    <div className="widget-card" style={{ border: "1px solid #f44336", color: "#c62828" }}>
                         โหลดข้อมูลไม่สำเร็จ: {String(err)}
                     </div>
                 )}
@@ -92,68 +109,18 @@ function Trends() {
                     {/* Top Keywords */}
                     <div className="widget-card">
                         <h3 className="widget-title">Top Keywords</h3>
-                        {err ? (
-                            <div className="chart-placeholder" style={{ color: "#c62828" }}>
-                                โหลดข้อมูลไม่สำเร็จ
-                            </div>
-                        ) : loading ? (
-                            <Skeleton height={200} />
-                        ) : keywords.length === 0 ? (
+                        {loading ? (
+                            <div className="chart-placeholder">กำลังโหลด…</div>
+                        ) : topKeywords.length === 0 ? (
                             <div className="chart-placeholder">ไม่มีข้อมูล</div>
                         ) : (
-                            <div className="chart-placeholder" style={{ alignItems: "stretch" }}>
-                                <div style={{ width: "100%" }}>
-                                    {keywords.map((k) => (
-                                        <div
-                                            key={k.word}
-                                            style={{
-                                                display: "grid",
-                                                gridTemplateColumns: "1fr auto",
-                                                gap: 8,
-                                                alignItems: "center",
-                                                marginBottom: 6,
-                                            }}
-                                        >
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {k.word}
-                      </span>
-                                            <b>{k.count}</b>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* กราฟเทรนด์รวม (LineChart) */}
-                    <div className="widget-card">
-                        <h3 className="widget-title">Mentions Trend</h3>
-                        {loading ? (
-                            <Skeleton height={220} />
-                        ) : trend.length === 0 ? (
-                            <div className="chart-placeholder">ไม่มีข้อมูล trend</div>
-                        ) : (
-                            <div
-                                style={{
-                                    height: 260,
-                                    background: "var(--light-bg)",
-                                    borderRadius: 10,
-                                    padding: 10,
-                                }}
-                            >
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={trend}>
-                                        <XAxis dataKey="date" />
-                                        <YAxis />
-                                        <Tooltip />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke="var(--primary-color)"
-                                            dot={false}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
+                            <div>
+                                {topKeywords.map((k) => (
+                                    <div key={k.tag} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #eee"}}>
+                                        <span>{k.tag}</span>
+                                        <b>{k.count}</b>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -162,12 +129,8 @@ function Trends() {
                     <div className="widget-card" style={{ gridColumn: "span 2" }}>
                         <h3 className="widget-title">Trending Posts</h3>
                         {loading ? (
-                            <div style={{ display: "grid", gap: 12 }}>
-                                <Skeleton height={28} />
-                                <Skeleton height={120} />
-                                <Skeleton height={18} />
-                            </div>
-                        ) : posts.length === 0 ? (
+                            <div className="chart-placeholder">กำลังโหลด…</div>
+                        ) : trendingPosts.length === 0 ? (
                             <div className="chart-placeholder">ไม่มีข้อมูล</div>
                         ) : (
                             <div className="table">
@@ -176,16 +139,12 @@ function Trends() {
                                     <div>Date</div>
                                     <div>Source</div>
                                 </div>
-                                {posts.map((p) => (
+                                {trendingPosts.map((p) => (
                                     <div className="t-row" key={p.id}>
-                                        <div className="t-title" title={p.title}>
-                                            {p.title}
-                                        </div>
+                                        <div className="t-title" title={p.title}>{p.title}</div>
                                         <div>{p.date}</div>
                                         <div>
-                                            <a href={p.url} target="_blank" rel="noreferrer">
-                                                เปิดลิงก์
-                                            </a>
+                                            <a href={p.url} target="_blank" rel="noreferrer">เปิดลิงก์</a>
                                         </div>
                                     </div>
                                 ))}
@@ -197,5 +156,3 @@ function Trends() {
         </div>
     );
 }
-
-export default Trends;

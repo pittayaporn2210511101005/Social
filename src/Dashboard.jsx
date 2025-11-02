@@ -1,46 +1,80 @@
 // src/Dashboard.jsx
-import React from "react";
+import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
-import "./Dashboard.css"; // โทนสีเดียวกับหน้าโฮม (อิงตัวแปร :root)
-import { getSentimentSummary } from "./services/api";
+import "./Dashboard.css";
 import { useFetch } from "./hooks/useFetch";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-
-
-
+import { getTweetAnalysis } from "./services/api";
 
 function SentimentBadge({ label }) {
+    const lbl = (label || "").toLowerCase();
+    const norm =
+        lbl === "pos" || lbl === "positive"
+            ? "positive"
+            : lbl === "neg" || lbl === "negative"
+                ? "negative"
+                : "neutral";
     const cls =
-        label === "positive"
+        norm === "positive"
             ? "badge badge-pos"
-            : label === "negative"
+            : norm === "negative"
                 ? "badge badge-neg"
                 : "badge badge-neu";
-    return <span className={cls}>{label}</span>;
+    return <span className={cls}>{norm}</span>;
 }
 
-function Dashboard() {
-    // ดึงข้อมูลผ่าน service (จะลอง API จริงก่อน ถ้าไม่ติดจะ fallback mock)
-    const {
-        data: summary,
-        loading: loadingSummary,
-        err: errSummary,
-    } = useFetch(() => getSummary(), []);
+export default function Dashboard() {
+    // ดึงข้อมูลจริงจากตาราง tweet_analysis
+    const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
+    const rows = data || [];
 
-    const {
-        data: mentions,
-        loading: loadingMentions,
-        err: errMentions,
-    } = useFetch(() => getMentions("?limit=5"), []);
+    // ---- สรุปตัวเลข / top faculties / รายการล่าสุด ----
+    const { totals, topFaculties, latestItems } = useMemo(() => {
+        let pos = 0,
+            neu = 0,
+            neg = 0;
 
-    const loading = loadingSummary || loadingMentions;
-    const error = errSummary || errMentions;
+        const byFaculty = new Map(); // faculty -> count
 
-    const totals =
-        summary?.totals ?? { mentions: 0, positive: 0, neutral: 0, negative: 0 };
-    const topFaculties = summary?.topFaculties ?? [];
+        for (const r of rows) {
+            const s = (r.sentimentLabel || "").toLowerCase();
+            if (s === "pos" || s === "positive") pos++;
+            else if (s === "neg" || s === "negative") neg++;
+            else neu++;
 
-    const items = mentions?.items ?? mentions ?? [];
+            const fac = r.faculty || "UNKNOWN";
+            byFaculty.set(fac, (byFaculty.get(fac) || 0) + 1);
+        }
+
+        const topFaculties = Array.from(byFaculty.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        const latestItems = [...rows]
+            .sort((a, b) =>
+                String(b.analyzedAt || "").localeCompare(String(a.analyzedAt || ""))
+            )
+            .slice(0, 5)
+            .map((r) => ({
+                id: r.id,
+                title: r.topicsJson || `Tweet ${r.tweetId || r.id}`,
+                faculty: r.faculty || "-",
+                sentiment: r.sentimentLabel || "-",
+                date: r.analyzedAt ? String(r.analyzedAt).slice(0, 10) : "",
+                url: r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "#",
+            }));
+
+        return {
+            totals: {
+                mentions: rows.length,
+                positive: pos,
+                neutral: neu,
+                negative: neg,
+            },
+            topFaculties,
+            latestItems,
+        };
+    }, [rows]);
 
     return (
         <div className="dashboard-container">
@@ -56,7 +90,6 @@ function Dashboard() {
                     <span className="logo-social"> Social</span>
                 </div>
 
-                {/* เมนูซ้าย: active = Dashboard */}
                 <nav className="nav-menu">
                     <Link to="/dashboard" className="nav-item active">
                         <i className="far fa-chart-line"></i>
@@ -81,14 +114,11 @@ function Dashboard() {
                 </nav>
             </div>
 
-            {/* หน้าหลัก */}
+            {/* เนื้อหาหลัก */}
             <div className="main-content">
                 <header className="main-header">
                     <div className="header-left">
                         <h1 className="header-title">Dashboard</h1>
-                        <div className="sub-note">
-                            * ดึงจาก API ถ้ามี, ไม่งั้นใช้ mock (public/mocks)
-                        </div>
                     </div>
                     <div className="header-right">
                         <div className="search-bar">
@@ -101,12 +131,12 @@ function Dashboard() {
                     </div>
                 </header>
 
-                {error && (
+                {err && (
                     <div
                         className="widget-card"
                         style={{ border: "1px solid #f44336", color: "#c62828" }}
                     >
-                        โหลดข้อมูลไม่สำเร็จ: {String(error)}
+                        โหลดข้อมูลไม่สำเร็จ: {String(err)}
                     </div>
                 )}
 
@@ -119,13 +149,9 @@ function Dashboard() {
                                 <span className="metric-title">Total Mentions</span>
                             </div>
                             <div className="metric-content">
-                                {loading ? (
-                                    <span>กำลังโหลด...</span>
-                                ) : (
-                                    <span className="metric-value">
-                    {totals.mentions.toLocaleString()}
-                  </span>
-                                )}
+                <span className="metric-value">
+                  {loading ? "…" : totals.mentions.toLocaleString()}
+                </span>
                                 <div className="metric-graph" />
                             </div>
                         </div>
@@ -135,19 +161,17 @@ function Dashboard() {
                                 <span className="metric-title">Positive / Neutral / Negative</span>
                             </div>
                             <div className="metric-content">
-                                {loading ? (
-                                    <span>กำลังโหลด...</span>
-                                ) : (
-                                    <span className="metric-value">
-                    {totals.positive} / {totals.neutral} / {totals.negative}
-                  </span>
-                                )}
+                <span className="metric-value">
+                  {loading
+                      ? "…"
+                      : `${totals.positive} / ${totals.neutral} / ${totals.negative}`}
+                </span>
                                 <div className="metric-graph" />
                             </div>
                         </div>
                     </div>
 
-                    {/* Sentiment Overview */}
+                    {/* Sentiment Overview (ข้อความย่อ) */}
                     <div className="widget-card widget-sentiment">
                         <h3 className="widget-title">Sentiment Overview</h3>
                         <div className="chart-placeholder">
@@ -157,11 +181,11 @@ function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Mentions Trend (placeholder) */}
+                    {/* Mentions Trend (placeholder — จะต่อยอดภายหลังได้) */}
                     <div className="widget-card widget-mentions-trend">
                         <h3 className="widget-title">Mentions Trend</h3>
                         <div className="chart-placeholder">
-                            {loading ? "กำลังโหลด..." : "ใส่กราฟจริงภายหลัง"}
+                            {loading ? "กำลังโหลด..." : "เพิ่มกราฟจริงภายหลัง"}
                         </div>
                     </div>
 
@@ -195,7 +219,6 @@ function Dashboard() {
                     {/* Latest Mentions */}
                     <div className="widget-card">
                         <h3 className="widget-title">Latest Mentions</h3>
-
                         {loading ? (
                             <div className="chart-placeholder">กำลังโหลด...</div>
                         ) : (
@@ -208,7 +231,7 @@ function Dashboard() {
                                     <div>Source</div>
                                 </div>
 
-                                {items.map((m) => (
+                                {latestItems.map((m) => (
                                     <div className="t-row" key={m.id}>
                                         <div className="t-title" title={m.title}>
                                             {m.title}
@@ -226,22 +249,16 @@ function Dashboard() {
                                     </div>
                                 ))}
 
-                                {items.length === 0 && (
+                                {latestItems.length === 0 && (
                                     <div style={{ color: "#777", padding: "10px 0" }}>
                                         ไม่พบรายการ
                                     </div>
                                 )}
                             </div>
                         )}
-
-                        <div className="mock-hint">
-                            * ถ้า API ยังไม่พร้อม ระบบจะใช้ไฟล์ mock ใน <code>public/mocks</code>
-                        </div>
                     </div>
                 </main>
             </div>
         </div>
     );
 }
-
-export default Dashboard;

@@ -1,54 +1,43 @@
 // src/services/api.js
-const BASE = import.meta.env.VITE_API_BASE || ""; // ใส่ URL หลังบ้านจริงใน .env ภายหลัง
+export const API_BASE =
+    import.meta.env.VITE_API_BASE || "http://localhost:8082";
 
-async function tryJson(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Bad response");
-    return res.json();
+/* ---------------- helpers ---------------- */
+function toQuery(params = {}) {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && String(v).trim() !== "") q.set(k, v);
+    });
+    return q.toString();
 }
 
-async function safeFetch(primaryFn, mockUrl) {
+async function get(path, params = {}, { timeoutMs = 15000 } = {}) {
+    const qs = toQuery(params);
+    const url = `${API_BASE}${path}${qs ? `?${qs}` : ""}`;
+
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), timeoutMs);
+
     try {
-        // ลองเรียก API จริงก่อน
-        return await primaryFn();
-        // eslint-disable-next-line no-unused-vars
-    } catch (_) {
-        // ถ้า fail → ใช้ mock
-        return await tryJson(mockUrl);
+        const res = await fetch(url, { signal: ac.signal });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        return await res.json();
+    } finally {
+        clearTimeout(t);
     }
 }
 
-/** SENTIMENT SUMMARY */
-export function getSentimentSummary() {
-    return safeFetch(
-      () => tryJson("http://localhost:8082/sentiment/summary"),
-      "/mocks/sentiment_summary.json"
-    );
-}
-
-/** MENTIONS */
-export function getMentions(qs = "") {
-    const suffix = qs.startsWith("?") ? qs : qs ? `?${qs}` : "";
-    return safeFetch(
-        () => tryJson(`${BASE}/api/mentions${suffix}`),
-        "/mocks/mentions.json"
-    );
-}
-
-
-
-/** TRENDS (keywords + posts) */
-export function getTrends() {
-    return safeFetch(
-        () => tryJson(`${BASE}/api/trends`),
-        "/mocks/trends.json"
-    );
-}
-
-/** ✅ MENTIONS TREND (สำหรับกราฟเส้นใน Homepage) */
-export function getMentionsTrend() {
-    return safeFetch(
-        () => tryJson(`${BASE}/api/mentions/trend`),
-        "/mocks/mentions_trend.json"
-    );
+/* ---------------- API (จริง) ---------------- */
+/**
+ * ดึงผลวิเคราะห์ทวีตจากตาราง tweet_analysis
+ * รองรับตัวกรองแบบง่าย ๆ (ฝั่งหน้าเว็บจะกรองเพิ่มเองก็ได้)
+ * @param {Object} params
+ *   - keyword?   (string)
+ *   - sentiment? ("pos"|"neu"|"neg")
+ *   - faculty?   (string)
+ */
+export async function getTweetAnalysis(params = {}) {
+    // ตอนนี้ backend เปิด GET /analysis แบบรวม
+    // ถ้าภายหลังรองรับ query string ก็ส่ง params ไปได้เลย
+    return get("/analysis", params);
 }
