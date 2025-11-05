@@ -5,6 +5,33 @@ import "./Dashboard.css";
 import { useFetch } from "./hooks/useFetch";
 import { getTweetAnalysis } from "./services/api";
 
+// Recharts
+import {
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    Tooltip,
+    CartesianGrid,
+    PieChart,
+    Pie,
+    Cell,
+    BarChart,
+    Bar,
+} from "recharts";
+
+/* ---------- theme colors (UTCC-ish) ---------- */
+const COLORS = {
+    blue: "#1E3A8A",
+    yellow: "#FCD34D",
+    green: "#22C55E",
+    red: "#EF4444",
+    gray: "#94A3B8",
+    surface: "#F8FAFC",
+};
+
+/* ---------- small components ---------- */
 function SentimentBadge({ label }) {
     const lbl = (label || "").toLowerCase();
     const norm =
@@ -13,72 +40,132 @@ function SentimentBadge({ label }) {
             : lbl === "neg" || lbl === "negative"
                 ? "negative"
                 : "neutral";
-    const cls =
-        norm === "positive"
-            ? "badge badge-pos"
-            : norm === "negative"
-                ? "badge badge-neg"
-                : "badge badge-neu";
+    const cls = `pill pill-${norm}`;
     return <span className={cls}>{norm}</span>;
 }
 
+/* ---------- helpers ---------- */
+function tryParseJsonArray(str) {
+    try {
+        const v = JSON.parse(str);
+        return Array.isArray(v) ? v : null;
+    } catch {
+        return null;
+    }
+}
+function parseTopicsFromAny(r) {
+    if (Array.isArray(r.topics) && r.topics.length) return r.topics; // DTO ใหม่
+    if (r.topicsJson && /^[\[\{]/.test(String(r.topicsJson).trim())) {
+        const arr = tryParseJsonArray(r.topicsJson);
+        if (arr && arr.length) return arr.map(String);
+    }
+    if (r.topicsJson && typeof r.topicsJson === "string") {
+        const arr = r.topicsJson.split(",").map((s) => s.trim()).filter(Boolean);
+        if (arr.length) return arr;
+    }
+    return [];
+}
+const clip = (s, n = 60) => (s && s.length > n ? s.slice(0, n) + "…" : s || "-");
+
+/* ===================================================== */
+
 export default function Dashboard() {
-    // ดึงข้อมูลจริงจากตาราง tweet_analysis
+    // อ่านจากฐานจริง
     const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
     const rows = data || [];
 
-    // ---- สรุปตัวเลข / top faculties / รายการล่าสุด ----
-    const { totals, topFaculties, latestItems } = useMemo(() => {
-        let pos = 0,
-            neu = 0,
-            neg = 0;
+    /* ---------- normalize rows ---------- */
+    const normRows = useMemo(() => {
+        const arr = Array.isArray(rows) ? rows : [];
+        return arr.map((r, idx) => {
+            const topics = parseTopicsFromAny(r);
+            const title =
+                topics.length > 0
+                    ? topics.join(", ")
+                    : r.text
+                        ? clip(r.text, 80)
+                        : `Tweet ${r.tweetId || r.id || ""}`;
 
-        const byFaculty = new Map(); // faculty -> count
+            const s = (r.sentimentLabel || r.sent || "").toLowerCase();
+            const sentiment =
+                s === "pos" || s === "positive"
+                    ? "positive"
+                    : s === "neg" || s === "negative"
+                        ? "negative"
+                        : "neutral";
 
-        for (const r of rows) {
-            const s = (r.sentimentLabel || "").toLowerCase();
-            if (s === "pos" || s === "positive") pos++;
-            else if (s === "neg" || s === "negative") neg++;
+            const rawDate = r.analyzedAt || r.createdAt || r.crawlTime || "";
+            const date = rawDate ? String(rawDate).slice(0, 10) : "-";
+
+            const tweetId = r.tweetId || r.id || String(idx);
+            const url = tweetId ? `https://x.com/i/web/status/${tweetId}` : undefined;
+
+            return {
+                tweetId,
+                title,
+                faculty: r.faculty || "UNKNOWN",
+                sentiment,
+                date,
+                source: r.source || "X",
+                url,
+            };
+        });
+    }, [rows]);
+
+    /* ---------- totals / top fac / latest ---------- */
+    const { totals, topFaculties, latestItems, sentShare } = useMemo(() => {
+        let pos = 0, neu = 0, neg = 0;
+        const byFaculty = new Map();
+
+        for (const m of normRows) {
+            if (m.sentiment === "positive") pos++;
+            else if (m.sentiment === "negative") neg++;
             else neu++;
 
-            const fac = r.faculty || "UNKNOWN";
+            const fac = m.faculty || "UNKNOWN";
             byFaculty.set(fac, (byFaculty.get(fac) || 0) + 1);
         }
+
+        const total = normRows.length || 1;
+        const sentShare = [
+            { name: "Positive", value: pos, color: COLORS.green },
+            { name: "Neutral", value: neu, color: COLORS.gray },
+            { name: "Negative", value: neg, color: COLORS.red },
+        ];
 
         const topFaculties = Array.from(byFaculty.entries())
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
 
-        const latestItems = [...rows]
-            .sort((a, b) =>
-                String(b.analyzedAt || "").localeCompare(String(a.analyzedAt || ""))
-            )
-            .slice(0, 5)
-            .map((r) => ({
-                id: r.id,
-                title: r.topicsJson || `Tweet ${r.tweetId || r.id}`,
-                faculty: r.faculty || "-",
-                sentiment: r.sentimentLabel || "-",
-                date: r.analyzedAt ? String(r.analyzedAt).slice(0, 10) : "",
-                url: r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "#",
-            }));
+        const latestItems = [...normRows]
+            .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+            .slice(0, 5);
 
         return {
-            totals: {
-                mentions: rows.length,
-                positive: pos,
-                neutral: neu,
-                negative: neg,
-            },
+            totals: { mentions: total, positive: pos, neutral: neu, negative: neg },
             topFaculties,
             latestItems,
+            sentShare,
         };
-    }, [rows]);
+    }, [normRows]);
+
+    /* ---------- trend (mentions per day) ---------- */
+    const trendData = useMemo(() => {
+        const byDay = new Map(); // yyyy-mm-dd -> count
+        for (const m of normRows) {
+            const d = m.date && m.date !== "-" ? m.date : null;
+            if (!d) continue;
+            byDay.set(d, (byDay.get(d) || 0) + 1);
+        }
+        return Array.from(byDay.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([date, count]) => ({ date, count }));
+    }, [normRows]);
 
     return (
         <div className="dashboard-container">
-            {/* แถบซ้าย */}
+            {/* Sidebar */}
             <div className="sidebar">
                 <div className="logo-container">
                     <img
@@ -92,29 +179,24 @@ export default function Dashboard() {
 
                 <nav className="nav-menu">
                     <Link to="/dashboard" className="nav-item active">
-                        <i className="far fa-chart-line"></i>
-                        <span>Dashboard</span>
+                        <i className="far fa-chart-line"></i><span>Dashboard</span>
                     </Link>
                     <Link to="/mentions" className="nav-item">
-                        <i className="fas fa-comment-dots"></i>
-                        <span>Mentions</span>
+                        <i className="fas fa-comment-dots"></i><span>Mentions</span>
                     </Link>
                     <Link to="/sentiment" className="nav-item">
-                        <i className="fas fa-smile"></i>
-                        <span>Sentiment</span>
+                        <i className="fas fa-smile"></i><span>Sentiment</span>
                     </Link>
                     <Link to="/trends" className="nav-item">
-                        <i className="fas fa-stream"></i>
-                        <span>Trends</span>
+                        <i className="fas fa-stream"></i><span>Trends</span>
                     </Link>
                     <Link to="/settings" className="nav-item">
-                        <i className="fas fa-cog"></i>
-                        <span>Settings</span>
+                        <i className="fas fa-cog"></i><span>Settings</span>
                     </Link>
                 </nav>
             </div>
 
-            {/* เนื้อหาหลัก */}
+            {/* Main */}
             <div className="main-content">
                 <header className="main-header">
                     <div className="header-left">
@@ -132,88 +214,122 @@ export default function Dashboard() {
                 </header>
 
                 {err && (
-                    <div
-                        className="widget-card"
-                        style={{ border: "1px solid #f44336", color: "#c62828" }}
-                    >
+                    <div className="widget-card error-card">
                         โหลดข้อมูลไม่สำเร็จ: {String(err)}
                     </div>
                 )}
 
-                {/* วิดเจ็ต */}
+                {/* Widgets */}
                 <main className="widgets-grid">
                     {/* Metrics */}
                     <div className="widget-metrics">
+                        {/* Total */}
                         <div className="metric-card">
-                            <div className="metric-header">
-                                <span className="metric-title">Total Mentions</span>
+                            <div className="metric-title">Total Mentions</div>
+                            <div className="metric-value">
+                                {loading ? "…" : totals.mentions.toLocaleString()}
                             </div>
-                            <div className="metric-content">
-                <span className="metric-value">
-                  {loading ? "…" : totals.mentions.toLocaleString()}
-                </span>
-                                <div className="metric-graph" />
+                            <div className="metric-sub">
+                                {loading ? "" : `POS ${totals.positive} · NEU ${totals.neutral} · NEG ${totals.negative}`}
+                            </div>
+                            <div className="progress">
+                <span
+                    className="bar bar-pos"
+                    style={{ width: `${(totals.positive / (totals.mentions || 1)) * 100}%` }}
+                />
+                                <span
+                                    className="bar bar-neu"
+                                    style={{ width: `${(totals.neutral / (totals.mentions || 1)) * 100}%` }}
+                                />
+                                <span
+                                    className="bar bar-neg"
+                                    style={{ width: `${(totals.negative / (totals.mentions || 1)) * 100}%` }}
+                                />
                             </div>
                         </div>
 
+                        {/* Sentiment overview - Pie */}
                         <div className="metric-card">
-                            <div className="metric-header">
-                                <span className="metric-title">Positive / Neutral / Negative</span>
+                            <div className="metric-title">Sentiment Overview</div>
+                            <div className="pie-wrap">
+                                {loading ? (
+                                    <div className="chart-placeholder">กำลังโหลด...</div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={140}>
+                                        <PieChart>
+                                            <Pie
+                                                data={sentShare}
+                                                dataKey="value"
+                                                nameKey="name"
+                                                innerRadius={38}
+                                                outerRadius={58}
+                                                paddingAngle={2}
+                                            >
+                                                {sentShare.map((e, i) => (
+                                                    <Cell key={i} fill={e.color} />
+                                                ))}
+                                            </Pie>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                )}
                             </div>
-                            <div className="metric-content">
-                <span className="metric-value">
-                  {loading
-                      ? "…"
-                      : `${totals.positive} / ${totals.neutral} / ${totals.negative}`}
-                </span>
-                                <div className="metric-graph" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sentiment Overview (ข้อความย่อ) */}
-                    <div className="widget-card widget-sentiment">
-                        <h3 className="widget-title">Sentiment Overview</h3>
-                        <div className="chart-placeholder">
-                            {loading
-                                ? "กำลังโหลด..."
-                                : `บวก ${totals.positive} | กลาง ${totals.neutral} | ลบ ${totals.negative}`}
-                        </div>
-                    </div>
-
-                    {/* Mentions Trend (placeholder — จะต่อยอดภายหลังได้) */}
-                    <div className="widget-card widget-mentions-trend">
-                        <h3 className="widget-title">Mentions Trend</h3>
-                        <div className="chart-placeholder">
-                            {loading ? "กำลังโหลด..." : "เพิ่มกราฟจริงภายหลัง"}
-                        </div>
-                    </div>
-
-                    {/* Top Faculties */}
-                    <div className="widget-card widget-hashtags">
-                        <h3 className="widget-title">Top Faculties</h3>
-                        <div className="chart-placeholder">
-                            {loading ? (
-                                "กำลังโหลด..."
-                            ) : topFaculties.length === 0 ? (
-                                "ไม่มีข้อมูล"
-                            ) : (
-                                topFaculties.map((f) => (
-                                    <div
-                                        key={f.name}
-                                        className="fac-row"
-                                        style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            marginBottom: 8,
-                                        }}
-                                    >
-                                        <span className="fac-name">{f.name}</span>
-                                        <b className="fac-count">{f.count}</b>
-                                    </div>
-                                ))
+                            {!loading && (
+                                <div className="legend-inline">
+                                    <span className="dot" style={{ background: COLORS.green }} />
+                                    POS &nbsp;&nbsp;
+                                    <span className="dot" style={{ background: COLORS.gray }} />
+                                    NEU &nbsp;&nbsp;
+                                    <span className="dot" style={{ background: COLORS.red }} />
+                                    NEG
+                                </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Mentions Trend */}
+                    <div className="widget-card">
+                        <h3 className="widget-title">Mentions Trend</h3>
+                        {loading ? (
+                            <div className="chart-placeholder">กำลังโหลด...</div>
+                        ) : trendData.length === 0 ? (
+                            <div className="chart-placeholder">ยังไม่มีข้อมูลวันที่</div>
+                        ) : (
+                            <div style={{ width: "100%", height: 220 }}>
+                                <ResponsiveContainer>
+                                    <LineChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                                        <Tooltip />
+                                        <Line type="monotone" dataKey="count" strokeWidth={2} dot />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Top Faculties - Bar */}
+                    <div className="widget-card">
+                        <h3 className="widget-title">Top Faculties</h3>
+                        {loading ? (
+                            <div className="chart-placeholder">กำลังโหลด...</div>
+                        ) : (
+                            <div style={{ width: "100%", height: 220 }}>
+                                <ResponsiveContainer>
+                                    <BarChart
+                                        data={[...topFaculties].reverse()} // ให้อันที่มากสุดอยู่บน
+                                        layout="vertical"
+                                        margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis type="number" allowDecimals={false} />
+                                        <YAxis type="category" dataKey="name" width={120} />
+                                        <Tooltip />
+                                        <Bar dataKey="count" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
                     </div>
 
                     {/* Latest Mentions */}
@@ -231,26 +347,26 @@ export default function Dashboard() {
                                     <div>Source</div>
                                 </div>
 
-                                {latestItems.map((m) => (
-                                    <div className="t-row" key={m.id}>
-                                        <div className="t-title" title={m.title}>
-                                            {m.title}
-                                        </div>
+                                {latestItems.map((m, index) => (
+                                    <div className="t-row" key={m.tweetId || index}>
+                                        <div className="t-title" title={m.title}>{clip(m.title, 50)}</div>
                                         <div>{m.faculty}</div>
-                                        <div>
-                                            <SentimentBadge label={m.sentiment} />
-                                        </div>
+                                        <div><SentimentBadge label={m.sentiment} /></div>
                                         <div>{m.date}</div>
                                         <div>
-                                            <a href={m.url} target="_blank" rel="noreferrer">
-                                                เปิดลิงก์
-                                            </a>
+                                            {m.url ? (
+                                                <a className="link" href={m.url} target="_blank" rel="noreferrer">
+                                                    เปิดลิงก์
+                                                </a>
+                                            ) : (
+                                                "-"
+                                            )}
                                         </div>
                                     </div>
                                 ))}
 
                                 {latestItems.length === 0 && (
-                                    <div style={{ color: "#777", padding: "10px 0" }}>
+                                    <div style={{ color: "#64748B", padding: "10px 0" }}>
                                         ไม่พบรายการ
                                     </div>
                                 )}

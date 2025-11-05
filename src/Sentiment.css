@@ -1,0 +1,92 @@
+/* ===== โครง layout ให้เหมือนทุกหน้า: ซ้าย sidebar, ขวา content ===== */
+.sentiment-layout { display: flex; min-height: 100vh; width: 100%; }
+
+/* ถ้าโปรเจ็กต์คุณมีสไตล์ .sidebar อยู่แล้ว ไฟล์นี้จะไม่ทับสี/ฟอนต์เดิม */
+.sentiment-layout .sidebar { flex: 0 0 240px; }
+
+/* พื้นที่คอนเทนต์ขวา */
+.sentiment-layout .main-content { flex: 1; padding: 24px 24px 40px; }
+
+/* จำกัดความกว้างและกึ่งกลาง */
+.content-wrap { max-width: 1200px; margin: 0 auto; }
+
+/* Header แถวบน: ชื่อหน้า + ปุ่ม */
+.page-header {
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; margin-bottom:14px;
+}
+.page-title { font-size:28px; font-weight:800; color:#1e3a8a; margin:0; }
+.page-sub { color:#475569; font-size:14px; margin-top:2px; }
+.title-wrap { display:flex; flex-direction:column; gap:2px; }
+.actions { display:flex; gap:8px; align-items:center; }
+.btn { border:1px solid #cbd5e1; padding:8px 12px; border-radius:10px; font-weight:700; background:#fff; }
+.btn.primary { background:#1e3a8a; color:#fff; border-color:#1e3a8a; }
+.btn.ghost { background:#fff; color:#0f172a; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn:hover { opacity:.95; }
+
+/* แถวบน: ฟิลเตอร์ + พาย (สูงเท่ากัน) */
+.top-grid {
+    display:grid; grid-template-columns: 1.2fr 0.8fr;
+    gap:16px; align-items:stretch; margin-bottom:16px;
+}
+.card { background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 8px rgba(15,23,42,.06); height:100%; }
+.widget-title { font-size:16px; font-weight:700; margin-bottom:8px; color:#0f172a; }
+
+/* Filters */
+.filter-card .filter-row {
+    display:grid; grid-template-columns: 1fr 200px 180px; gap:10px;
+}
+.search, .filter-card select {
+    border:1px solid #cbd5e1; border-radius:10px; padding:8px 10px; background:#fff; min-height:40px;
+}
+.search { width:100%; }
+
+/* Pie legend */
+.pie-card .legend-inline { margin-top:6px; font-size:12px; color:#475569; display:flex; gap:16px; align-items:center; }
+.legend-inline .dot { width:10px; height:10px; border-radius:999px; display:inline-block; }
+.legend-inline .pos { background:#22C55E; }
+.legend-inline .neu { background:#FACC15; }
+.legend-inline .neg { background:#EF4444; }
+
+/* states */
+.placeholder { height:220px; display:flex; align-items:center; justify-content:center; color:#94A3B8; background:#F8FAFC; border-radius:8px; }
+.error-card { background:#fff1f2; color:#991b1b; border:1px solid #ef4444; padding:10px 12px; border-radius:10px; }
+
+/* chips */
+.pill { padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; text-transform:capitalize; }
+.pill-pos { background:#dcfce7; color:#166534; }
+.pill-neu { background:#fef9c3; color:#92400e; }
+.pill-neg { background:#fee2e2; color:#991b1b; }
+.flag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+.flag.ok { background:#e2e8f0; color:#334155; }
+.flag.bad { background:#fee2e2; color:#991b1b; }
+
+/* ตารางข้อมูล */
+.table { width:100%; margin-top:10px; }
+.t-head, .t-row {
+    display:grid;
+    grid-template-columns: .5fr 2.2fr 1.1fr 1fr .9fr .7fr .7fr 1.1fr .7fr;
+    gap:10px; align-items:center;
+}
+.t-head { font-weight:700; color:#1e293b; border-bottom:2px solid #e2e8f0; padding-bottom:6px; }
+.t-row { padding:10px 0; border-bottom:1px dashed #e2e8f0; font-size:14px; }
+.t-row:hover { background:#f9fafb; }
+.topics { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.link { color:#1d4ed8; font-weight:700; text-decoration:none; }
+.link:hover { text-decoration:underline; }
+
+/* Pager */
+.pager { display:flex; gap:8px; align-items:center; justify-content:flex-end; padding-top:10px; }
+.page-ind { color:#475569; font-weight:700; }
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .top-grid { grid-template-columns: 1fr; }
+    .filter-card .filter-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 720px) {
+    .filter-card .filter-row { grid-template-columns: 1fr; }
+    .actions { gap:6px; }
+    .btn { padding:6px 10px; }
+}

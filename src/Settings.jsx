@@ -1,51 +1,107 @@
-import React, { useEffect, useState } from "react";
+// src/pages/Settings.jsx  (ปรับ path ตามโปรเจกต์คุณ)
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import "./Homepage.css"; // ใช้โทนเดียวกับหน้าโฮม
+import "./Homepage.css";
+import { getSettings, updateSettings } from "./services/api";
+import { postScanAlerts, postTestMail } from "./services/api";
+import { applyTheme } from "./theme/applyTheme";
 
-function Settings() {
-    // ------------ ค่าเริ่มต้น (mock) ------------
-    const defaultConfig = {
-        theme: "light",                     // light | dark (mock)
-        notifyEmail: true,
-        notifyThreshold: 20,                // แจ้งเตือนเมื่อมีลบเกิน %
-        sources: {                          // แหล่งข้อมูลที่จะเก็บ (สาธารณะ)
-            news: true,
-            forums: true,
-            youtube: false,
-            tiktok: false,
-            blogs: true,
-        },
-        facultyScope: "ทั้งหมด",            // ขอบเขตการวิเคราะห์
-    };
+export default function SettingsPage() {
+    // ---------- state ----------
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving]   = useState(false);
+    const [err, setErr]         = useState("");
+    const [ok, setOk]           = useState("");
 
-    const [config, setConfig] = useState(defaultConfig);
-    const [savedNote, setSavedNote] = useState("");
+    const [theme, setTheme] = useState("LIGHT");
+    const [notificationsEnabled, setNotify] = useState(true);
+    const [negativeThreshold, setNeg] = useState(20);
+    const [sources, setSources] = useState([]);
+    const [analysisScope, setScope] = useState("ทั้งหมด");
+    const [updatedAt, setUpdatedAt] = useState("");
 
-    // โหลดค่าจาก localStorage (ถ้ามี)
+    const allSources = useMemo(
+        () => ["news", "forums", "youtube", "tiktok", "blogs"],
+        []
+    );
+
+    // ---------- load settings ----------
     useEffect(() => {
-        const raw = localStorage.getItem("utcc_social_settings");
-        if (raw) {
+        let alive = true;
+        (async () => {
+            setLoading(true); setErr(""); setOk("");
             try {
-                setConfig({ ...defaultConfig, ...JSON.parse(raw) });
-            } catch (_) {}
-        }
+                const s = await getSettings();
+                if (!alive) return;
+                setTheme((s?.theme || "LIGHT").toUpperCase() === "DARK" ? "DARK" : "LIGHT");
+                setNotify(!!s?.notificationsEnabled);
+                setNeg(Number(s?.negativeThreshold ?? 20));
+                setSources(Array.isArray(s?.sources) ? s.sources : []);
+                setScope(s?.analysisScope || "ทั้งหมด");
+                setUpdatedAt(s?.updatedAt || "");
+            } catch (e) {
+                setErr("โหลดการตั้งค่าไม่สำเร็จ: " + String(e?.message || e));
+            } finally {
+                setLoading(false);
+            }
+        })();
+        return () => { alive = false; };
     }, []);
 
-    const saveConfig = () => {
-        localStorage.setItem("utcc_social_settings", JSON.stringify(config));
-        setSavedNote("บันทึกการตั้งค่าเรียบร้อย (Mock)");
-        setTimeout(() => setSavedNote(""), 1800);
+    // ---------- handlers ----------
+    const toggleSource = (name) => {
+        setSources((old) => old.includes(name) ? old.filter(x => x !== name) : [...old, name]);
     };
 
+    const onReset = async () => {
+           setErr(""); setOk("");
+           setLoading(true);
+           try {
+                 const s = await getSettings();
+                 setTheme((s?.theme||"LIGHT").toUpperCase()==="DARK"?"DARK":"LIGHT");
+                 setNotify(!!s?.notificationsEnabled);
+                 setNeg(Number(s?.negativeThreshold ?? 20));
+                 setSources(Array.isArray(s?.sources) ? s.sources : []);
+                 setScope(s?.analysisScope || "ทั้งหมด");
+                 setUpdatedAt(s?.updatedAt || "");
+                 applyTheme(s?.theme);
+               } catch (e) {
+                 setErr("โหลดค่าจากฐานไม่สำเร็จ: " + String(e?.message||e));
+               } finally { setLoading(false); }
+         };
+
+    const onSave = async () => {
+        setSaving(true); setErr(""); setOk("");
+        try {
+            await postScanAlerts(); // สแกน negative & แจ้งเตือนถ้าเกิน threshold
+            await postTestMail();   // ส่งอีเมลทดสอบ (backend log จะแสดง)
+            await updateSettings({
+                theme,
+                notificationsEnabled,
+                negativeThreshold: Number(negativeThreshold || 0),
+                sources,
+                analysisScope,
+            });
+            applyTheme(theme);
+            setOk("บันทึกสำเร็จ ✅");
+            const s2 = await getSettings(); // อ่านกลับเพื่ออัปเดตเวลา
+            setUpdatedAt(s2?.updatedAt || "");
+        } catch (e) {
+            setErr("บันทึกไม่สำเร็จ: " + String(e?.message || e));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // ---------- UI ----------
     return (
-        <div className="homepage-container">
+        <div className="homepage-container">{/* ใช้โครงเดียวกับหน้าอื่น */}
             {/* Sidebar */}
             <div className="sidebar">
                 <div className="logo-container">
                     <img
                         src="https://upload.wikimedia.org/wikipedia/th/f/f5/%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2%E0%B8%AB%E0%B8%AD%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%84%E0%B9%89%E0%B8%B2%E0%B9%84%E0%B8%97%E0%B8%A2.svg"
-                        width="100%"
-                        alt="UTCC"
+                        width="100%" alt="UTCC"
                     />
                     <span className="logo-utcc"> UTCC </span>
                     <span className="logo-social"> Social</span>
@@ -53,24 +109,19 @@ function Settings() {
 
                 <nav className="nav-menu">
                     <Link to="/dashboard" className="nav-item">
-                        <i className="far fa-chart-line"></i>
-                        <span>Dashboard</span>
+                        <i className="far fa-chart-line"></i><span>Dashboard</span>
                     </Link>
                     <Link to="/mentions" className="nav-item">
-                        <i className="fas fa-comment-dots"></i>
-                        <span>Mentions</span>
+                        <i className="fas fa-comment-dots"></i><span>Mentions</span>
                     </Link>
                     <Link to="/sentiment" className="nav-item">
-                        <i className="fas fa-smile"></i>
-                        <span>Sentiment</span>
+                        <i className="fas fa-smile"></i><span>Sentiment</span>
                     </Link>
                     <Link to="/trends" className="nav-item">
-                        <i className="fas fa-stream"></i>
-                        <span>Trends</span>
+                        <i className="fas fa-stream"></i><span>Trends</span>
                     </Link>
                     <Link to="/settings" className="nav-item active">
-                        <i className="fas fa-cog"></i>
-                        <span>Settings</span>
+                        <i className="fas fa-cog"></i><span>Settings</span>
                     </Link>
                 </nav>
             </div>
@@ -80,168 +131,110 @@ function Settings() {
                 <header className="main-header">
                     <div className="header-left">
                         <h1 className="header-title">Settings</h1>
-                        <div className="sub-note" style={{ color: "#666" }}>
-                            * หน้านี้เป็นการตั้งค่าแบบ <b>Mock</b> — เก็บไว้ใน localStorage เท่านั้น
-                        </div>
+                        {updatedAt && (
+                                 <div style={{color:"var(--muted)", fontSize:14, marginTop:4}}>
+                                       อัปเดตล่าสุด: {String(updatedAt).replace("T"," ").slice(0,19)}
+                                     </div>
+                            )}
                     </div>
-                    <div className="header-right">
-                        <div className="search-bar">
-                            <i className="fas fa-search"></i>
-                            <input type="text" placeholder="Search in settings" />
-                        </div>
-                        <div className="profile-icon">
-                            <i className="fas fa-user-circle"></i>
-                        </div>
+                    <div className="header-right" style={{ gap: 8 }}>
+                        <button onClick={onReset} className="btn btn-ghost">Reset</button>
+                        <button onClick={onSave} className="btn btn-primary" disabled={saving || loading}>
+                            {saving ? "Saving..." : "Save Settings"}
+                        </button>
                     </div>
                 </header>
 
-                <main className="widgets-grid">
+                {err && (
+                    <div className="widget-card" style={{ border: "1px solid #f44336", color: "#c62828" }}>
+                        {err}
+                    </div>
+                )}
+                {ok && (
+                    <div className="widget-card" style={{ border: "1px solid #2e7d32", color: "#2e7d32" }}>
+                        {ok}
+                    </div>
+                )}
+
+                <main className="widgets-grid">{/* ใช้กริดเดียวกับหน้าอื่น */}
                     {/* Theme */}
-                    <section className="widget-card">
+                    <div className="widget-card">
                         <h3 className="widget-title">Theme</h3>
-                        <div className="chart-placeholder" style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <input
-                                    type="radio"
-                                    name="theme"
-                                    checked={config.theme === "light"}
-                                    onChange={() => setConfig({ ...config, theme: "light" })}
-                                />
+                        <div className="form-row">
+                            <label className="radio">
+                                <input type="radio" name="theme" checked={theme === "LIGHT"} onChange={() => setTheme("LIGHT")} />
                                 โทนสว่าง (ฟ้า/เทาอ่อน)
                             </label>
-                            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <input
-                                    type="radio"
-                                    name="theme"
-                                    checked={config.theme === "dark"}
-                                    onChange={() => setConfig({ ...config, theme: "dark" })}
-                                />
+                        </div>
+                        <div className="form-row">
+                            <label className="radio">
+                                <input type="radio" name="theme" checked={theme === "DARK"} onChange={() => setTheme("DARK")} />
                                 โทนเข้ม (Dark/Night)
                             </label>
                         </div>
-                    </section>
+                    </div>
 
                     {/* Notifications */}
-                    <section className="widget-card">
+                    <div className="widget-card">
                         <h3 className="widget-title">Notifications</h3>
-                        <div className="chart-placeholder" style={{ display: "grid", gap: 12 }}>
-                            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={config.notifyEmail}
-                                    onChange={(e) => setConfig({ ...config, notifyEmail: e.target.checked })}
-                                />
-                                ส่งอีเมลแจ้งเตือน (Mock)
-                            </label>
-                            <div>
-                                <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
-                                    แจ้งเตือนเมื่อสัดส่วน <b>Negative</b> มากกว่า (%)
-                                </div>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={config.notifyThreshold}
-                                    onChange={(e) =>
-                                        setConfig({ ...config, notifyThreshold: Number(e.target.value) || 0 })
-                                    }
-                                    style={{
-                                        width: 120,
-                                        padding: "8px 10px",
-                                        borderRadius: 8,
-                                        border: "1px solid #ddd",
-                                        background: "#fff",
-                                    }}
-                                />
-                            </div>
+                        <label className="form-row">
+                            <input
+                                type="checkbox"
+                                checked={notificationsEnabled}
+                                onChange={(e) => setNotify(e.target.checked)}
+                            />
+                            <span style={{ marginLeft: 8 }}>ส่งอีเมลแจ้งเตือน</span>
+                        </label>
+                        <div className="form-row" style={{ alignItems: "center" }}>
+                            <div>แจ้งเตือนเมื่อสัดส่วน Negative มากกว่า (%)</div>
+                            <input
+                                type="number"
+                                min={0} max={100}
+                                value={negativeThreshold}
+                                onChange={(e) => setNeg(e.target.value)}
+                                className="input"
+                                style={{ width: 120, marginLeft: 10 }}
+                            />
                         </div>
-                    </section>
+                    </div>
 
-                    {/* Sources */}
-                    <section className="widget-card">
+                    {/* Data Sources */}
+                    <div className="widget-card">
                         <h3 className="widget-title">Data Sources (Public)</h3>
-                        <div className="chart-placeholder" style={{ display: "grid", gap: 10 }}>
-                            {Object.entries(config.sources).map(([key, val]) => (
-                                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div className="form-grid">
+                            {allSources.map((s) => (
+                                <label key={s} className="checkbox">
                                     <input
                                         type="checkbox"
-                                        checked={val}
-                                        onChange={(e) =>
-                                            setConfig({
-                                                ...config,
-                                                sources: { ...config.sources, [key]: e.target.checked },
-                                            })
-                                        }
+                                        checked={sources.includes(s)}
+                                        onChange={() => toggleSource(s)}
                                     />
-                                    {key}
+                                    <span style={{ marginLeft: 6 }}>{s}</span>
                                 </label>
                             ))}
                         </div>
-                    </section>
+                    </div>
 
-                    {/* Faculty Scope */}
-                    <section className="widget-card">
+                    {/* Analysis Scope */}
+                    <div className="widget-card">
                         <h3 className="widget-title">ขอบเขตการวิเคราะห์</h3>
-                        <div className="chart-placeholder" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                            <select
-                                value={config.facultyScope}
-                                onChange={(e) => setConfig({ ...config, facultyScope: e.target.value })}
-                                style={{
-                                    padding: "8px 10px",
-                                    borderRadius: 8,
-                                    border: "1px solid #ddd",
-                                    background: "#fff",
-                                }}
-                            >
-                                <option>ทั้งหมด</option>
-                                <option>คณะบริหารธุรกิจ</option>
-                                <option>คณะวิทยาศาสตร์ฯ (CS)</option>
-                                <option>คณะนิติศาสตร์</option>
-                                <option>คณะบัญชี</option>
-                            </select>
+                        <select
+                            value={analysisScope}
+                            onChange={(e) => setScope(e.target.value)}
+                            className="select"
+                            style={{ width: 180 }}
+                        >
+                            <option value="ทั้งหมด">ทั้งหมด</option>
+                            <option value="เฉพาะคณะ">เฉพาะคณะ</option>
+                        </select>
+                        <div style={{ color: "#666", marginTop: 8 }}>
+                            ใช้กำหนดการแสดงผล/รายงานเริ่มต้นในหน้าต่าง ๆ
                         </div>
-                    </section>
-
-                    {/* Actions */}
-                    <section className="widget-card" style={{ alignSelf: "start" }}>
-                        <h3 className="widget-title">Actions</h3>
-                        <div className="chart-placeholder" style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                            <button
-                                onClick={saveConfig}
-                                style={{
-                                    background: "#0d47a1",
-                                    color: "#fff",
-                                    border: "none",
-                                    borderRadius: 8,
-                                    padding: "8px 14px",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Save Settings
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setConfig(defaultConfig);
-                                    localStorage.removeItem("utcc_social_settings");
-                                }}
-                                style={{
-                                    background: "#e0e0e0",
-                                    color: "#111",
-                                    border: "none",
-                                    borderRadius: 8,
-                                    padding: "8px 14px",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Reset
-                            </button>
-                            <span style={{ color: "#2e7d32", fontSize: 12 }}>{savedNote}</span>
-                        </div>
-                    </section>
+                    </div>
                 </main>
+
+                {loading && <div style={{ color: "#666" }}>กำลังโหลด…</div>}
             </div>
         </div>
     );
 }
-
-export default Settings;
