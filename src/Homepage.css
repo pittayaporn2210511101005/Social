@@ -177,7 +177,92 @@ html, body ,#root{
     justify-content: space-between;
   }
 
+/* Sticky filter bar */
+.filters-sticky {
+    position: sticky;
+    top: 64px; /* ใต้หัวข้อหลัก */
+    z-index: 5;
+    background: #f8fafc;
+    padding-top: 6px;
+    margin-bottom: 8px;
+}
+
+/* Header toolbar */
+.subhead { color:#475569; font-size:14px; margin-top:4px; }
+.toolbar { display:flex; gap:8px; align-items:center; margin-right:12px; }
+.btn { border:1px solid #cbd5e1; padding:6px 12px; border-radius:8px; font-weight:700; }
+.btn.ghost { background:#fff; color:#0f172a; }
+.btn.primary { background:#1e3a8a; color:#fff; border-color:#1e3a8a; }
+.btn:hover { opacity:.92; }
+
+/* KPI grid */
+.kpi-grid {
+    display:grid;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    gap:16px;
+    margin:12px 0 8px;
+}
+.kpi-card {
+    background:#fff; border-radius:16px; padding:14px;
+    box-shadow:0 2px 8px rgba(15,23,42,.06);
+}
+.kpi-card .kpi-title { font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.04em; }
+.kpi-card .kpi-value { font-size:32px; font-weight:800; color:#0f172a; line-height:1.1; }
+.kpi-card .kpi-sub { margin-top:2px; color:#64748b; font-weight:700; }
+
+.kpi-card.pos { border-left:6px solid #22c55e; }
+.kpi-card.neu { border-left:6px solid #facc15; }
+.kpi-card.neg { border-left:6px solid #ef4444; }
+
+/* Widgets layout ปรับ spacing ให้อ่านง่าย */
+.widgets-grid {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:20px;
+}
+
+/* Table ใน MentionsTable (เผื่อยังไม่ได้สไตล์) */
+.table .t-head, .table .t-row {
+    grid-template-columns: 2.4fr 1fr 1fr 1fr .9fr !important;
+}
+
+
 @keyframes shimmer {
     0%   { background-position: 100% 0; }
     100% { background-position: 0 0; }
 }
+
+/* ---------- THEME ---------- */
+:root {
+    --bg: #f7f8ff;
+    --card: #ffffff;
+    --text: #0b1537;
+    --muted: #6b7280;
+    --brand: #101c8b;
+    --brand-2: #1625ad;
+    --accent: #ffbf00;
+    --border: #e5e7eb;
+}
+
+body.theme-dark {
+    --bg: #0b1020;
+    --card: #121a33;
+    --text: #e7e9f5;
+    --muted: #aab1c6;
+    --brand: #e7e9f5;
+    --brand-2: #c7cdf0;
+    --accent: #ffd166;
+    --border: #2a355a;
+}
+
+/* ใช้ตัวแปรกับองค์ประกอบหลัก */
+body { background: var(--bg); color: var(--text); }
+.sidebar { background:#0f1f7a; } /* คงโทน UTCC */
+.main-content { background: var(--bg); }
+.widget-card { background: var(--card); border: 1px solid var(--border); }
+.widget-title { color: var(--text); }
+.btn-primary { background: var(--accent); color:#111; }
+
+/* ตาราง/อินพุตพื้นฐาน */
+.input, .select { background: var(--card); color: var(--text); border:1px solid var(--border); }
+

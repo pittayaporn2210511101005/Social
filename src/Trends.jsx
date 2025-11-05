@@ -1,71 +1,156 @@
 // src/Trends.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import "./Trends.css";
 import { Link } from "react-router-dom";
-// import "./Trends.css";               // ถ้าไม่มีไฟล์นี้ ให้ลบบรรทัด import ทิ้งได้
 import { useFetch } from "./hooks/useFetch";
 import { getTweetAnalysis } from "./services/api";
 
-/** พยายามแปลง topicsJson ให้เป็น array ถ้าเป็น text จะดึง #hashtag ออกมา */
-function toTopicsList(topicsJson) {
-    if (!topicsJson) return [];
-    // 1) ลอง parse เป็น JSON array ก่อน
-    try {
-        const js = JSON.parse(topicsJson);
-        if (Array.isArray(js)) return js.filter(Boolean).map(String);
-    } catch (_) {}
-    // 2) ถ้าไม่ใช่ JSON: ดึง hashtags จากสตริง
-    const tags = String(topicsJson).match(/#[\p{L}\d_]+/gu) || [];
-    return tags.map(t => t.trim());
-}
+/* ---------- helpers ---------- */
+const pickDate = (r) =>
+    (r.analyzedAt || r.createdAt || r.crawlTime || "")
+        .toString()
+        .slice(0, 10);
+
+const parseTopics = (r) => {
+    if (Array.isArray(r.topics) && r.topics.length) return r.topics;
+    const tj = r.topicsJson;
+    if (!tj) return [];
+    const str = String(tj).trim();
+    if (str.startsWith("[") || str.startsWith("{")) {
+        try {
+            const arr = JSON.parse(str);
+            if (Array.isArray(arr)) return arr.map(String);
+        } catch (_) {}
+    }
+    return str.split(",").map((s) => s.trim()).filter(Boolean);
+};
+
+// ตัดคำแบบง่ายสำหรับกรณีไม่มี topics: ดึงจาก text แล้วตัด stopwords
+const STOP = new Set([
+    "the","a","an","of","and","or","to","in","on","for","with","at","by","is","are","am",
+    "ค่ะ","คะ","ครับ","และ","หรือ","ที่","ว่า","เป็น","มี","ให้","ได้","ไป","มา","แล้ว","เลย","ก็","อยู่","เรา","คุณ","เขา","จาก","ถึง","กับ","ใน","บน","ของ","ว่า",
+]);
+const tokenizeText = (t="") =>
+    t
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((w) => w.length > 1 && !STOP.has(w));
 
 export default function Trends() {
-    // ดึงข้อมูลจริงจากตาราง tweet_analysis
+    // ดึงข้อมูลจริง
     const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
     const rows = data || [];
 
-    // สร้าง Top Keywords และลิสต์โพสต์ล่าสุด
-    const { topKeywords, trendingPosts } = useMemo(() => {
-        // --------- นับคีย์เวิร์ด/แฮชแท็ก ---------
-        const counter = new Map();
+    // ค้นหา
+    const [q, setQ] = useState("");
+
+    // ===== สร้าง Top Keywords =====
+    const { keywordsTop10, totalMentions } = useMemo(() => {
+        const freq = new Map();
+        let count = 0;
+
         for (const r of rows) {
-            const topics = toTopicsList(r.topicsJson);
-            for (const tRaw of topics) {
-                const t = tRaw.toLowerCase();
-                counter.set(t, (counter.get(t) || 0) + 1);
+            count++;
+            const topics = parseTopics(r);
+            if (topics.length) {
+                for (const t of topics) {
+                    const k = t.trim();
+                    if (!k) continue;
+                    freq.set(k, (freq.get(k) || 0) + 1);
+                }
+            } else if (r.text) {
+                for (const w of tokenizeText(r.text)) {
+                    freq.set(w, (freq.get(w) || 0) + 1);
+                }
             }
         }
-        const topKeywords = Array.from(counter.entries())
-            .map(([tag, count]) => ({ tag, count }))
+
+        const top = Array.from(freq.entries())
+            .map(([k, v]) => ({ keyword: k, count: v }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 10);
 
-        // --------- โพสต์มาแรง (ล่าสุด) ----------
-        const trendingPosts = [...rows]
-            .sort((a, b) =>
-                String(b.analyzedAt || "").localeCompare(String(a.analyzedAt || ""))
-            )
-            .slice(0, 5)
-            .map((r) => ({
-                id: r.id,
-                title:
-                    toTopicsList(r.topicsJson)[0] ||
-                    (r.faculty ? `โพสต์เกี่ยวกับ ${r.faculty}` : `Tweet ${r.tweetId}`),
-                date: r.analyzedAt ? String(r.analyzedAt).slice(0, 10) : "",
-                url: r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "#",
-            }));
-
-        return { topKeywords, trendingPosts };
+        return { keywordsTop10: top, totalMentions: count };
     }, [rows]);
 
+    // ===== Trending Posts =====
+    // นิยาม: โพสต์ที่มีคีย์เวิร์ดยอดฮิต (จาก top10) และใหม่สุดของแต่ละคีย์เวิร์ด
+    const trendingPosts = useMemo(() => {
+        const topSet = new Set(keywordsTop10.map((x) => x.keyword));
+        const pickedByKey = new Map(); // keyword -> row ล่าสุด
+
+        for (const r of rows) {
+            const ts = parseTopics(r);
+            const titleCand =
+                (ts && ts.length ? ts.join(", ") : (r.text || "").slice(0, 60)) || "โพสต์เกี่ยวกับ";
+            const d = pickDate(r);
+            const url = r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "#";
+
+            const apply = (kw) => {
+                const prev = pickedByKey.get(kw);
+                if (!prev || String(d).localeCompare(prev.date) > 0) {
+                    pickedByKey.set(kw, {
+                        id: r.id ?? r.tweetId ?? `${kw}-${d}`,
+                        title: titleCand,
+                        date: d,
+                        source: r.source || "X",
+                        url,
+                    });
+                }
+            };
+
+            if (ts.length) {
+                ts.forEach((k) => { if (topSet.has(k)) apply(k); });
+            } else if (r.text) {
+                for (const w of tokenizeText(r.text)) {
+                    if (topSet.has(w)) apply(w);
+                }
+            }
+        }
+
+        const list = Array.from(pickedByKey.values())
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+            .slice(0, 10);
+
+        // fallback: ถ้าไม่มีเลย ให้หยิบ 5 รายการล่าสุด
+        if (list.length === 0) {
+            return [...rows]
+                .sort((a, b) => String(pickDate(b)).localeCompare(String(pickDate(a))))
+                .slice(0, 5)
+                .map((r, i) => ({
+                    id: r.id ?? r.tweetId ?? i,
+                    title:
+                        parseTopics(r).join(", ") ||
+                        (r.text ? r.text.slice(0, 60) : "โพสต์"),
+                    date: pickDate(r),
+                    source: r.source || "X",
+                    url: r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "#",
+                }));
+        }
+
+        return list;
+    }, [rows, keywordsTop10]);
+
+    // กรองค้นหาในตาราง trending
+    const filteredTrending = useMemo(() => {
+        const qq = q.trim().toLowerCase();
+        if (!qq) return trendingPosts;
+        return trendingPosts.filter(
+            (p) =>
+                `${p.title} ${p.source}`.toLowerCase().includes(qq)
+        );
+    }, [q, trendingPosts]);
+
     return (
-        <div className="dashboard-container">
-            {/* Sidebar */}
-            <div className="sidebar">
+        <div className="trends-layout">
+            {/* Sidebar ให้เหมือนทุกหน้า */}
+            <aside className="sidebar">
                 <div className="logo-container">
                     <img
                         src="https://upload.wikimedia.org/wikipedia/th/f/f5/%E0%B8%95%E0%B8%A3%E0%B8%B2%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2%E0%B8%AB%E0%B8%AD%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%84%E0%B9%89%E0%B8%B2%E0%B9%84%E0%B8%97%E0%B8%A2.svg"
-                        width="100%"
-                        alt="UTCC"
+                        width="100%" alt="UTCC"
                     />
                     <span className="logo-utcc"> UTCC </span>
                     <span className="logo-social"> Social</span>
@@ -88,71 +173,88 @@ export default function Trends() {
                         <i className="fas fa-cog"></i><span>Settings</span>
                     </Link>
                 </nav>
-            </div>
+            </aside>
 
-            {/* Main */}
-            <div className="main-content">
-                <header className="main-header">
-                    <div className="header-left">
-                        <h1 className="header-title">Trends</h1>
-                        <div className="sub-note">* ดึงจากฐานข้อมูล tweet_analysis</div>
+            {/* Content */}
+            <main className="main-content">
+                <header className="page-header">
+                    <div className="title-wrap">
+                        <h1 className="page-title">Trends</h1>
+                        <div className="page-sub">* ดึงจากฐานข้อมูล <b>tweet_analysis</b> · รวมทั้งหมด {totalMentions} รายการ</div>
                     </div>
                 </header>
 
-                {err && (
-                    <div className="widget-card" style={{ border: "1px solid #f44336", color: "#c62828" }}>
-                        โหลดข้อมูลไม่สำเร็จ: {String(err)}
-                    </div>
-                )}
-
-                <main className="widgets-grid">
+                <div className="content-wrap">
                     {/* Top Keywords */}
-                    <div className="widget-card">
-                        <h3 className="widget-title">Top Keywords</h3>
+                    <section className="card">
+                        <div className="card-head">
+                            <h3 className="widget-title">Top Keywords</h3>
+                        </div>
+
                         {loading ? (
-                            <div className="chart-placeholder">กำลังโหลด…</div>
-                        ) : topKeywords.length === 0 ? (
-                            <div className="chart-placeholder">ไม่มีข้อมูล</div>
+                            <div className="placeholder">กำลังโหลด...</div>
+                        ) : keywordsTop10.length === 0 ? (
+                            <div className="placeholder">ไม่มีข้อมูล</div>
                         ) : (
-                            <div>
-                                {topKeywords.map((k) => (
-                                    <div key={k.tag} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #eee"}}>
-                                        <span>{k.tag}</span>
-                                        <b>{k.count}</b>
+                            <div className="keywords-grid">
+                                {keywordsTop10.map((k) => (
+                                    <div key={k.keyword} className="kw-chip" title={`${k.keyword} · ${k.count}`}>
+                                        <div className="kw-word">{k.keyword}</div>
+                                        <div className="kw-count">{k.count}</div>
                                     </div>
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </section>
 
                     {/* Trending Posts */}
-                    <div className="widget-card" style={{ gridColumn: "span 2" }}>
-                        <h3 className="widget-title">Trending Posts</h3>
+                    <section className="card">
+                        <div className="card-head">
+                            <h3 className="widget-title">Trending Posts</h3>
+                            <input
+                                className="search"
+                                placeholder="🔍 ค้นหาโพสต์"
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                            />
+                        </div>
+
+                        {err && (
+                            <div className="error-card">โหลดข้อมูลไม่สำเร็จ: {String(err)}</div>
+                        )}
+
                         {loading ? (
-                            <div className="chart-placeholder">กำลังโหลด…</div>
-                        ) : trendingPosts.length === 0 ? (
-                            <div className="chart-placeholder">ไม่มีข้อมูล</div>
+                            <div className="placeholder">กำลังโหลด...</div>
                         ) : (
                             <div className="table">
                                 <div className="t-head">
                                     <div>Title</div>
                                     <div>Date</div>
                                     <div>Source</div>
+                                    <div>Link</div>
                                 </div>
-                                {trendingPosts.map((p) => (
+
+                                {filteredTrending.map((p) => (
                                     <div className="t-row" key={p.id}>
-                                        <div className="t-title" title={p.title}>{p.title}</div>
-                                        <div>{p.date}</div>
+                                        <div className="title-cell" title={p.title}>{p.title}</div>
+                                        <div>{p.date || "-"}</div>
+                                        <div>{p.source}</div>
                                         <div>
-                                            <a href={p.url} target="_blank" rel="noreferrer">เปิดลิงก์</a>
+                                            {p.url && p.url !== "#" ? (
+                                                <a className="link" href={p.url} target="_blank" rel="noreferrer">เปิดลิงก์</a>
+                                            ) : "-"}
                                         </div>
                                     </div>
                                 ))}
+
+                                {filteredTrending.length === 0 && (
+                                    <div className="empty-row">ไม่พบรายการ</div>
+                                )}
                             </div>
                         )}
-                    </div>
-                </main>
-            </div>
+                    </section>
+                </div>
+            </main>
         </div>
     );
 }
