@@ -114,9 +114,6 @@ export default function SettingsPage() {
                     <Link to="/mentions" className="nav-item">
                         <i className="fas fa-comment-dots"></i><span>Mentions</span>
                     </Link>
-                    <Link to="/sentiment" className="nav-item">
-                        <i className="fas fa-smile"></i><span>Sentiment</span>
-                    </Link>
                     <Link to="/trends" className="nav-item">
                         <i className="fas fa-stream"></i><span>Trends</span>
                     </Link>

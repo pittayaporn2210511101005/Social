@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { useState } from "react";
 import Homepage from "./Homepage";
 import Dashboard from "./Dashboard";
-import Sentiment from "./Sentiment";
+//import Sentiment from "./Sentiment";
 import Trends from "./Trends";
 import Settings from "./Settings";
 import Pageone from "./Pageone";
@@ -42,14 +42,7 @@ export default function App() {
                 </RequireAuth>
               }
           />
-          <Route
-              path="/sentiment"
-              element={
-                <RequireAuth isLoggedIn={isLoggedIn}>
-                  <Sentiment />
-                </RequireAuth>
-              }
-          />
+
           <Route
               path="/trends"
               element={
