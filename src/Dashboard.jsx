@@ -138,7 +138,7 @@ export default function Dashboard() {
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
-            
+
 
             //กรองไม่เอา unknown
             const latestItems = [...normRows]
@@ -162,17 +162,23 @@ export default function Dashboard() {
     }, [normRows]);
 
     /* ---------- trend (mentions per day) ---------- */
-    const trendData = useMemo(() => {
-        const byDay = new Map(); // yyyy-mm-dd -> count
-        for (const m of normRows) {
-            const d = m.date && m.date !== "-" ? m.date : null;
-            if (!d) continue;
-            byDay.set(d, (byDay.get(d) || 0) + 1);
-        }
-        return Array.from(byDay.entries())
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([date, count]) => ({ date, count }));
-    }, [normRows]);
+const trendData = useMemo(() => {
+    const byDay = new Map(); // yyyy-mm-dd -> count
+
+    for (const m of normRows) {
+        // ✅ ใช้ createdAt ก่อน ถ้าไม่มีค่อย fallback เป็น analyzedAt
+        const rawDate = m.createdAt || m.analyzedAt || m.date;
+        const dateStr = rawDate ? String(rawDate).slice(0, 10) : null;
+        if (!dateStr) continue;
+
+        byDay.set(dateStr, (byDay.get(dateStr) || 0) + 1);
+    }
+
+    return Array.from(byDay.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, count]) => ({ date, count }));
+}, [normRows]);
+
 
     return (
         <div className="dashboard-container">
