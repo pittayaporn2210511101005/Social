@@ -332,7 +332,7 @@ export default function Dashboard() {
 
                     {/* Latest Mentions */}
                     <div className="widget-card">
-                        <h3 className="widget-title">Latest Mentions</h3>
+                        <h3 className="widget-title">Top 5 Positive & Negative Mentions</h3>
                         {loading ? (
                             <div className="chart-placeholder">กำลังโหลด...</div>
                         ) : (
