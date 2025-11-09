@@ -80,11 +80,12 @@ export default function Dashboard() {
         return arr.map((r, idx) => {
             const topics = parseTopicsFromAny(r);
             const title =
-                topics.length > 0
-                    ? topics.join(", ")
-                    : r.text
-                        ? clip(r.text, 80)
+                r.text
+                    ? clip(r.text, 80)
+                    : topics.length > 0
+                        ? topics.join(", ")
                         : `Tweet ${r.tweetId || r.id || ""}`;
+
 
             const s = (r.sentimentLabel || r.sent || "").toLowerCase();
             const sentiment =
@@ -137,10 +138,20 @@ export default function Dashboard() {
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
+            
 
-        const latestItems = [...normRows]
+            //กรองไม่เอา unknown
+            const latestItems = [...normRows]
+            .filter(
+                (m) =>
+                    (m.sentiment === "positive" || m.sentiment === "negative") &&
+                    m.faculty &&
+                    m.faculty.toUpperCase() !== "UNKNOWN" // ✅ กรองไม่เอา UNKNOWN
+            )
             .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
             .slice(0, 5);
+        
+    
 
         return {
             totals: { mentions: total, positive: pos, neutral: neu, negative: neg },
