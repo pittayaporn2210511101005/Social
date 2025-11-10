@@ -84,6 +84,12 @@ export function getSettings() {
     return get(p("/settings"));
 }
 
+export async function getTweetDates() {
+    const res = await fetch("http://localhost:8082/tweet-dates");
+    if (!res.ok) throw new Error("โหลดวันที่ tweet ไม่ได้");
+    return res.json();
+  }
+   
 /** อัปเดตการตั้งค่า */
 export function updateSettings(payload) {
     const body = {
