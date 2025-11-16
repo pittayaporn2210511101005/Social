@@ -1,0 +1,437 @@
+html, body ,#root{
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+}
+:root {
+    --primary-color:#1d1f8e;
+    --secondary-color: #ffc107; /* Yellow */
+    --light-bg: #f5f5f5;
+    --dark-text: #2c2c2c;
+    --light-text: #ffffff;
+    --card-bg: #ffffff;
+    --border-radius: 10px;
+  }
+
+.homepage-container{/*ทังหน้า*/
+    display: flex;
+    height: 100%;
+    overflow: hidden;/*ซ่อนสิ่งที่ล้นออกมา*/
+}
+.sidebar{/*แถบม่วง*/
+    width: 250px;
+    background-color: var(--primary-color);
+    color: var(--light-text);
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+}
+.logo-container{
+    font-weight: bold;
+    margin-bottom: 40px;
+}
+.logo-utcc{
+    color:var(--secondary-color);
+    font-size: 2.5rem;
+    margin-left: 15%;
+}
+.logo-social{
+    font-size: 1.7rem;
+    color: var(--light-text);
+}
+
+.nav-menu .nav-item{
+    display: flex;
+    align-items:center;
+    padding: 15px 20px;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    margin-bottom: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.nav-menu .nav-item:hover{
+    background-color: rgba(255, 255, 255, 0.1);
+}
+.nav-menu .nav-item.active{
+    background-color: var(--secondary-color);
+    color: var(--dark-text);
+}
+.nav-menu .navitem i{
+    margin-right: 15px;
+    font-size: 1.2rem;
+}
+
+/*ฝั่งmain ฝั่งขวา*/
+.main-content{
+    flex-grow:1;
+    height: 100%;
+
+    padding: 30px;
+    overflow-y:auto;
+    background-color: var(--card-bg);
+}
+.main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+
+  .header-title {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    background-color: var(--light-bg);
+    border-radius: 20px;
+    padding: 8px 15px;
+  }
+
+  .search-bar input {
+    border: none;
+    background: transparent;
+    padding: 0 5px;
+    outline: none;
+  }
+
+  .search-bar i {
+    color: #888;
+  }
+
+  .profile-icon i {
+    font-size: 2rem;
+    color: #888;
+    cursor: pointer;
+  }
+
+  .widgets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .widget-card {
+    background-color: var(--light-bg);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  }
+
+  .widget-title {
+    margin-top: 0;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--dark-text);
+  }
+
+  .chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    background-color: #eee;
+    border-radius: var(--border-radius);
+    color: #888;
+  }
+
+  .widget-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .metric-card {
+    background-color: var(--light-bg);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  }
+
+  .metric-title {
+    font-size: 1rem;
+    color: var(--primary-color);
+  }
+
+  .metric-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--dark-text);
+    margin-right: 10px;
+  }
+
+  .metric-content {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+/* Sticky filter bar */
+.filters-sticky {
+    position: sticky;
+    top: 64px; /* ใต้หัวข้อหลัก */
+    z-index: 5;
+    background: #f8fafc;
+    padding-top: 6px;
+    margin-bottom: 8px;
+}
+
+/* Header toolbar */
+.subhead { color:#475569; font-size:14px; margin-top:4px; }
+.toolbar { display:flex; gap:8px; align-items:center; margin-right:12px; }
+.btn { border:1px solid #cbd5e1; padding:6px 12px; border-radius:8px; font-weight:700; }
+.btn.ghost { background:#fff; color:#0f172a; }
+.btn.primary { background:#1e3a8a; color:#fff; border-color:#1e3a8a; }
+.btn:hover { opacity:.92; }
+
+/* KPI grid */
+.kpi-grid {
+    display:grid;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    gap:16px;
+    margin:12px 0 8px;
+}
+.kpi-card {
+    background:#fff; border-radius:16px; padding:14px;
+    box-shadow:0 2px 8px rgba(15,23,42,.06);
+}
+.kpi-card .kpi-title { font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.04em; }
+.kpi-card .kpi-value { font-size:32px; font-weight:800; color:#0f172a; line-height:1.1; }
+.kpi-card .kpi-sub { margin-top:2px; color:#64748b; font-weight:700; }
+
+.kpi-card.pos { border-left:6px solid #22c55e; }
+.kpi-card.neu { border-left:6px solid #facc15; }
+.kpi-card.neg { border-left:6px solid #ef4444; }
+
+/* Widgets layout ปรับ spacing ให้อ่านง่าย */
+.widgets-grid {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:20px;
+}
+
+@keyframes shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+
+/* ---------- THEME ---------- */
+:root {
+    --bg: #f7f8ff;
+    --card: #ffffff;
+    --text: #0b1537;
+    --muted: #6b7280;
+    --brand: #101c8b;
+    --brand-2: #1625ad;
+    --accent: #ffbf00;
+    --border: #e5e7eb;
+}
+
+body.theme-dark {
+    --bg: #0b1020;
+    --card: #121a33;
+    --text: #e7e9f5;
+    --muted: #aab1c6;
+    --brand: #e7e9f5;
+    --brand-2: #c7cdf0;
+    --accent: #ffd166;
+    --border: #2a355a;
+}
+
+/* ใช้ตัวแปรกับองค์ประกอบหลัก */
+body { background: var(--bg); color: var(--text); }
+.sidebar { background:#0f1f7a; } /* คงโทน UTCC */
+.main-content { background: var(--bg); }
+.widget-card { background: var(--card); border: 1px solid var(--border); }
+.widget-title { color: var(--text); }
+.btn-primary { background: var(--accent); color:#111; }
+
+/* ตาราง/อินพุตพื้นฐาน */
+.input, .select { background: var(--card); color: var(--text); border:1px solid var(--border); }
+
+/* ------ Sentiment inline edit (ในรายการโพสต์ตาม Sentiment) ------ */
+
+.sentiment-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sentiment-select {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+/* เอฟเฟกต์เวลาโฟกัส / โฮเวอร์ ให้ดูเป็นปุ่ม */
+.sentiment-select:focus,
+.sentiment-select:hover {
+  border-color: var(--brand-2);
+  box-shadow: 0 0 0 1px rgba(22, 37, 173, 0.18);
+}
+
+/* ===== ตาราง Mentions (10 คอลัมน์: เพิ่ม "จัดการ" ต่อจาก Link) ===== */
+
+.table .t-head,
+.table .t-row {
+  display: grid;
+  grid-template-columns:
+      60px   /* ID */
+      2fr    /* Topics */
+      1fr    /* Faculty */
+      1fr    /* Sentiment + select */
+      0.8fr  /* Source */
+      0.6fr  /* NSFW */
+      0.6fr  /* Toxic */
+      1fr    /* Analyzed At */
+      0.8fr  /* Link */
+      0.8fr; /* จัดการ */
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+/* ---------- History Modal ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 20px 24px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+}
+
+.modal-title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-empty {
+  padding: 8px 0 16px;
+  color: var(--muted);
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.history-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.history-field {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.history-from,
+.history-to {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.history-arrow {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.history-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* ปุ่มประวัติในคอลัมน์จัดการ */
+.history-link {
+  display: inline-block;
+  font-size: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.history-link:hover {
+  text-decoration: underline;
+}
+
+/* คอลัมน์จัดการ: แสดง "แก้ไข / ลบ" ให้เหมือนลิงก์ */
+.manage-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 13px;
+}
+
+.manage-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  cursor: pointer;
+  color: #111827; /* สีดำเข้ม */
+}
+
+.manage-link:hover {
+  text-decoration: underline;
+}
+
+.manage-separator {
+  margin: 0 2px;
+}

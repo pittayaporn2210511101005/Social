@@ -1,0 +1,31 @@
+{
+  "page": 1,
+  "page_size": 10,
+  "total": 3,
+  "items": [
+    {
+      "id": 1,
+      "title": "UTCC เปิดรับสมัครนักศึกษาใหม่ 2568",
+      "url": "https://example.com/news/utcc",
+      "faculty": "คณะบริหารธุรกิจ",
+      "sentiment": "positive",
+      "date": "2025-08-28"
+    },
+    {
+      "id": 2,
+      "title": "รีวิวสาขา CS ที่ UTCC เรียนอะไร จบทำงานอะไร",
+      "url": "https://example.com/blog/utcc-cs",
+      "faculty": "คณะวิทยาศาสตร์ฯ (CS)",
+      "sentiment": "neutral",
+      "date": "2025-08-27"
+    },
+    {
+      "id": 3,
+      "title": "ความคิดเห็นเรื่องที่จอดรถหน้าอาคารเรียน",
+      "url": "https://example.com/forum/parking",
+      "faculty": "บริการ/สิ่งอำนวยความสะดวก",
+      "sentiment": "negative",
+      "date": "2025-08-26"
+    }
+  ]
+}
