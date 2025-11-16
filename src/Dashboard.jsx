@@ -3,7 +3,7 @@ import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import "./Dashboard.css";
 import { useFetch } from "./hooks/useFetch";
-import { getTweetAnalysis, getTweetDates } from "./services/api"; // ✅ เพิ่ม getTweetDates
+import { getTweetAnalysis, getTweetDates } from "./services/api";
 
 // Recharts
 import {
@@ -21,186 +21,119 @@ import {
     Bar,
 } from "recharts";
 
-/* ---------- theme colors (UTCC-ish) ---------- */
+/* ---------- theme colors ---------- */
 const COLORS = {
-    blue: "#1E3A8A",
-    yellow: "#FCD34D",
     green: "#22C55E",
     red: "#EF4444",
     gray: "#94A3B8",
-    surface: "#F8FAFC",
 };
 
-/* ---------- small components ---------- */
+/* ---------- Badge ---------- */
 function SentimentBadge({ label }) {
     const lbl = (label || "").toLowerCase();
     const norm =
         lbl === "pos" || lbl === "positive"
             ? "positive"
             : lbl === "neg" || lbl === "negative"
-                ? "negative"
-                : "neutral";
-    const cls = `pill pill-${norm}`;
-    return <span className={cls}>{norm}</span>;
+            ? "negative"
+            : "neutral";
+    return <span className={`pill pill-${norm}`}>{norm}</span>;
 }
 
-/* ---------- helpers ---------- */
-function tryParseJsonArray(str) {
-    try {
-        const v = JSON.parse(str);
-        return Array.isArray(v) ? v : null;
-    } catch {
-        return null;
-    }
-}
-
-function parseTopicsFromAny(r) {
-    if (Array.isArray(r.topics) && r.topics.length) return r.topics; // DTO ใหม่
-    if (r.topicsJson && /^[\[\{]/.test(String(r.topicsJson).trim())) {
-        const arr = tryParseJsonArray(r.topicsJson);
-        if (arr && arr.length) return arr.map(String);
-    }
-    if (r.topicsJson && typeof r.topicsJson === "string") {
-        const arr = r.topicsJson
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-        if (arr.length) return arr;
-    }
-    return [];
-}
-
+/* ---------- Helpers ---------- */
 const clip = (s, n = 60) =>
     s && s.length > n ? s.slice(0, n) + "…" : s || "-";
 
 /* ===================================================== */
-
 export default function Dashboard() {
-    // ✅ ดึงผลวิเคราะห์ (tweet_analysis)
+    /* Fetch data */
     const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
     const rows = data || [];
 
-    // ✅ ดึงวันที่จาก table tweet (endpoint /tweet-dates)
     const {
         data: tweetDates,
         loading: loadingDates,
         err: errDates,
     } = useFetch(() => getTweetDates(), []);
 
-    /* ---------- normalize rows ---------- */
+    /* ---------- Normalize rows ---------- */
     const normRows = useMemo(() => {
-        const arr = Array.isArray(rows) ? rows : [];
-        return arr.map((r, idx) => {
-            const topics = parseTopicsFromAny(r);
-            const title = r.text
-                ? clip(r.text, 80)
-                : topics.length > 0
-                ? topics.join(", ")
-                : `Tweet ${r.tweetId || r.id || ""}`;
-
-            const s = (r.sentimentLabel || r.sent || "").toLowerCase();
-            const sentiment =
-                s === "pos" || s === "positive"
+        return rows.map((r, idx) => ({
+            tweetId: r.tweetId || r.id || String(idx),
+            title: clip(r.text || "-", 80),
+            faculty: r.faculty || "UNKNOWN",
+            sentiment:
+                r.sentimentLabel?.toLowerCase() === "positive"
                     ? "positive"
-                    : s === "neg" || s === "negative"
+                    : r.sentimentLabel?.toLowerCase() === "negative"
                     ? "negative"
-                    : "neutral";
-
-            const rawDate =
-                r.analyzedAt || r.createdAt || r.crawlTime || "";
-            const date = rawDate
-                ? String(rawDate).slice(0, 10)
-                : "-";
-
-            const tweetId = r.tweetId || r.id || String(idx);
-            const url = tweetId
-                ? `https://x.com/i/web/status/${tweetId}`
-                : undefined;
-
-            return {
-                tweetId,
-                title,
-                faculty: r.faculty || "UNKNOWN",
-                sentiment,
-                date,
-                source: r.source || "X",
-                url,
-            };
-        });
+                    : "neutral",
+            date: (r.analyzedAt || r.createdAt || "").slice(0, 10),
+            source: r.source || "X",
+            url: r.tweetId ? `https://x.com/i/web/status/${r.tweetId}` : "-",
+        }));
     }, [rows]);
 
-    /* ---------- totals / top fac / latest ---------- */
+    /* ---------- Calculation ---------- */
     const { totals, topFaculties, latestItems, sentShare } = useMemo(() => {
         let pos = 0,
             neu = 0,
             neg = 0;
-        const byFaculty = new Map();
+
+        const facCount = new Map();
 
         for (const m of normRows) {
             if (m.sentiment === "positive") pos++;
             else if (m.sentiment === "negative") neg++;
             else neu++;
 
-            const fac = m.faculty || "UNKNOWN";
-            byFaculty.set(fac, (byFaculty.get(fac) || 0) + 1);
+            facCount.set(m.faculty, (facCount.get(m.faculty) || 0) + 1);
         }
 
-        const total = normRows.length || 1;
-
-        const sentShare = [
-            { name: "Positive", value: pos, color: COLORS.green },
-            { name: "Neutral", value: neu, color: COLORS.gray },
-            { name: "Negative", value: neg, color: COLORS.red },
-        ];
-
-        const topFaculties = Array.from(byFaculty.entries())
+        const topFaculties = Array.from(facCount.entries())
+            .filter(([name]) => name !== "มหาวิทยาลัยโดยรวม")
             .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5);
+            .sort((a, b) => b.count - a.count);
 
         const latestItems = [...normRows]
-            .filter(
-                (m) =>
-                    (m.sentiment === "positive" ||
-                        m.sentiment === "negative") &&
-                    m.faculty &&
-                    m.faculty.toUpperCase() !== "UNKNOWN"
-            )
-            .sort((a, b) =>
-                String(b.date || "").localeCompare(String(a.date || ""))
-            )
+            .filter((m) => ["positive", "negative"].includes(m.sentiment))
+            .sort((a, b) => b.date.localeCompare(a.date))
             .slice(0, 5);
 
         return {
             totals: {
-                mentions: total,
+                mentions: normRows.length,
                 positive: pos,
                 neutral: neu,
                 negative: neg,
             },
             topFaculties,
             latestItems,
-            sentShare,
+            sentShare: [
+                { name: "Positive", value: pos, color: COLORS.green },
+                { name: "Neutral", value: neu, color: COLORS.gray },
+                { name: "Negative", value: neg, color: COLORS.red },
+            ],
         };
     }, [normRows]);
 
-    /* ---------- Mentions Trend จาก tweetDates ---------- */
+    /* ---------- Trend Data ---------- */
     const trendData = useMemo(() => {
         if (!Array.isArray(tweetDates)) return [];
+        const map = new Map();
 
-        const byDay = new Map(); // yyyy-MM-dd -> count
+        tweetDates.forEach((d) => {
+            const date = d.slice(0, 10);
+            map.set(date, (map.get(date) || 0) + 1);
+        });
 
-        for (const d of tweetDates) {
-            const dateStr = String(d).slice(0, 10);
-            if (!dateStr) continue;
-            byDay.set(dateStr, (byDay.get(dateStr) || 0) + 1);
-        }
-
-        return Array.from(byDay.entries())
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([date, count]) => ({ date, count }));
+        return [...map.entries()].map(([date, count]) => ({
+            date,
+            count,
+        }));
     }, [tweetDates]);
 
+    /* ===================================================== */
     return (
         <div className="dashboard-container">
             {/* Sidebar */}
@@ -238,9 +171,7 @@ export default function Dashboard() {
             {/* Main */}
             <div className="main-content">
                 <header className="main-header">
-                    <div className="header-left">
-                        <h1 className="header-title">Dashboard</h1>
-                    </div>
+                    <h1 className="header-title">Dashboard</h1>
                 </header>
 
                 {err && (
@@ -250,244 +181,108 @@ export default function Dashboard() {
                 )}
 
                 <main className="widgets-grid">
-                    {/* Metrics */}
+                    {/* -------- Row 1 (Total + Sentiment) -------- */}
                     <div className="widget-metrics">
                         <div className="metric-card">
                             <div className="metric-title">Total Mentions</div>
                             <div className="metric-value">
-                                {loading
-                                    ? "…"
-                                    : totals.mentions.toLocaleString()}
+                                {loading ? "…" : totals.mentions}
                             </div>
                             <div className="metric-sub">
-                                {loading
-                                    ? ""
-                                    : `POS ${totals.positive} · NEU ${totals.neutral} · NEG ${totals.negative}`}
+                                POS {totals.positive} · NEU {totals.neutral} · NEG {totals.negative}
                             </div>
                         </div>
 
-                        {/* Sentiment overview - Pie */}
                         <div className="metric-card">
-                            <div className="metric-title">
-                                Sentiment Overview
-                            </div>
-                            <div className="pie-wrap">
-                                {loading ? (
-                                    <div className="chart-placeholder">
-                                        กำลังโหลด...
-                                    </div>
-                                ) : (
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height={140}
+                            <div className="metric-title">Sentiment Overview</div>
+
+                            <ResponsiveContainer width="100%" height={150}>
+                                <PieChart>
+                                    <Pie
+                                        data={sentShare}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        innerRadius={40}
+                                        outerRadius={60}
                                     >
-                                        <PieChart>
-                                            <Pie
-                                                data={sentShare}
-                                                dataKey="value"
-                                                nameKey="name"
-                                                innerRadius={38}
-                                                outerRadius={58}
-                                                paddingAngle={2}
-                                            >
-                                                {sentShare.map((e, i) => (
-                                                    <Cell
-                                                        key={i}
-                                                        fill={e.color}
-                                                    />
-                                                ))}
-                                            </Pie>
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                )}
+                                        {sentShare.map((e, i) => (
+                                            <Cell key={i} fill={e.color} />
+                                        ))}
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+
+                            <div className="legend-inline">
+                                <span className="dot" style={{ background: COLORS.green }} /> POS
+                                <span className="dot" style={{ background: COLORS.gray }} /> NEU
+                                <span className="dot" style={{ background: COLORS.red }} /> NEG
                             </div>
-                            {!loading && (
-                                <div className="legend-inline">
-                                    <span
-                                        className="dot"
-                                        style={{
-                                            background: COLORS.green,
-                                        }}
-                                    />
-                                    POS &nbsp;&nbsp;
-                                    <span
-                                        className="dot"
-                                        style={{
-                                            background: COLORS.gray,
-                                        }}
-                                    />
-                                    NEU &nbsp;&nbsp;
-                                    <span
-                                        className="dot"
-                                        style={{ background: COLORS.red }}
-                                    />
-                                    NEG
-                                </div>
-                            )}
                         </div>
                     </div>
 
-                    {/* Mentions Trend */}
-                    <div className="widget-card">
+                    {/* -------- Row 2 (Trend + Faculties) -------- */}
+                    <div className="widget-card widget-trend">
                         <h3 className="widget-title">Mentions Trend</h3>
-                        {loadingDates ? (
-                            <div className="chart-placeholder">
-                                กำลังโหลด...
-                            </div>
-                        ) : errDates ? (
-                            <div className="chart-placeholder">
-                                โหลดข้อมูลวันที่ไม่สำเร็จ
-                            </div>
-                        ) : trendData.length === 0 ? (
-                            <div className="chart-placeholder">
-                                ยังไม่มีข้อมูลวันที่
-                            </div>
-                        ) : (
-                            <div
-                                style={{ width: "100%", height: 220 }}
-                            >
-                                <ResponsiveContainer>
-                                    <LineChart
-                                        data={trendData}
-                                        margin={{
-                                            top: 10,
-                                            right: 20,
-                                            left: 0,
-                                            bottom: 0,
-                                        }}
-                                    >
-                                        <CartesianGrid
-                                            strokeDasharray="3 3"
-                                        />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 12 }}
-                                        />
-                                        <YAxis
-                                            allowDecimals={false}
-                                            tick={{ fontSize: 12 }}
-                                        />
-                                        <Tooltip />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="count"
-                                            strokeWidth={2}
-                                            dot
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
+
+                        <div style={{ width: "100%", height: 250 }}>
+                            <ResponsiveContainer>
+                                <LineChart data={trendData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip />
+                                    <Line type="monotone" dataKey="count" stroke="#2563eb" dot />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
 
-                    {/* Top Faculties - Bar */}
-                    <div className="widget-card">
+                    <div className="widget-card widget-faculty">
                         <h3 className="widget-title">Top Faculties</h3>
-                        {loading ? (
-                            <div className="chart-placeholder">
-                                กำลังโหลด...
-                            </div>
-                        ) : (
-                            <div
-                                style={{ width: "100%", height: 220 }}
-                            >
-                                <ResponsiveContainer>
-                                    <BarChart
-                                        data={[...topFaculties].reverse()}
-                                        layout="vertical"
-                                        margin={{
-                                            top: 10,
-                                            right: 20,
-                                            left: 10,
-                                            bottom: 0,
-                                        }}
-                                    >
-                                        <CartesianGrid
-                                            strokeDasharray="3 3"
-                                        />
-                                        <XAxis
-                                            type="number"
-                                            allowDecimals={false}
-                                        />
-                                        <YAxis
-                                            type="category"
-                                            dataKey="name"
-                                            width={120}
-                                        />
-                                        <Tooltip />
-                                        <Bar dataKey="count" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
+                        <div style={{ width: "100%", height: topFaculties.length * 45 }}>
+                            <ResponsiveContainer>
+                                <BarChart
+                                    data={[...topFaculties].reverse()}
+                                    layout="vertical"
+                                    margin={{ top: 10, right: 20, left: 40, bottom: 10 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" width={140} />
+                                    <Tooltip />
+                                    <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 6, 6]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
 
-                    {/* Latest Mentions */}
-                    <div className="widget-card">
-                        <h3 className="widget-title">
-                            Top 5 Positive & Negative Mentions
-                        </h3>
-                        {loading ? (
-                            <div className="chart-placeholder">
-                                กำลังโหลด...
+                    {/* -------- Row 3 (Latest Mentions) -------- */}
+                    <div className="widget-card widget-latest">
+                        <h3 className="widget-title">Top 5 Positive & Negative Mentions เดี๋ยวแก้ต่อให้เพิ่มตรงคะแนน </h3>
+
+                        <div className="table">
+                            <div className="t-head">
+                                <div>Title</div>
+                                <div>Faculty</div>
+                                <div>Sentiment</div>
+                                <div>Date</div>
+                                <div>Source</div>
                             </div>
-                        ) : (
-                            <div className="table">
-                                <div className="t-head">
-                                    <div>Title</div>
-                                    <div>Faculty</div>
-                                    <div>Sentiment</div>
-                                    <div>Date</div>
-                                    <div>Source</div>
+
+                            {latestItems.map((m, idx) => (
+                                <div className="t-row" key={idx}>
+                                    <div className="t-title">{clip(m.title, 50)}</div>
+                                    <div>{m.faculty}</div>
+                                    <div><SentimentBadge label={m.sentiment} /></div>
+                                    <div>{m.date}</div>
+                                    <div>
+                                        <a className="link" href={m.url} target="_blank" rel="noreferrer">
+                                            เปิดลิงก์
+                                        </a>
+                                    </div>
                                 </div>
-
-                                {latestItems.map((m, index) => (
-                                    <div
-                                        className="t-row"
-                                        key={m.tweetId || index}
-                                    >
-                                        <div
-                                            className="t-title"
-                                            title={m.title}
-                                        >
-                                            {clip(m.title, 50)}
-                                        </div>
-                                        <div>{m.faculty}</div>
-                                        <div>
-                                            <SentimentBadge
-                                                label={m.sentiment}
-                                            />
-                                        </div>
-                                        <div>{m.date}</div>
-                                        <div>
-                                            {m.url ? (
-                                                <a
-                                                    className="link"
-                                                    href={m.url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                >
-                                                    เปิดลิงก์
-                                                </a>
-                                            ) : (
-                                                "-"
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {latestItems.length === 0 && (
-                                    <div
-                                        style={{
-                                            color: "#64748B",
-                                            padding: "10px 0",
-                                        }}
-                                    >
-                                        ไม่พบรายการ
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                            ))}
+                        </div>
                     </div>
                 </main>
             </div>

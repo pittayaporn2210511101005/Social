@@ -41,6 +41,7 @@ html, body ,#root{
     color: var(--light-text);
 }
 
+
 .nav-menu .nav-item{
     display: flex;
     align-items:center;
@@ -116,11 +117,12 @@ html, body ,#root{
     cursor: pointer;
   }
 
-  .widgets-grid {
+  .homepage-widgets {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
-  }
+}
+
 
   .widget-card {
     background-color: var(--light-bg);

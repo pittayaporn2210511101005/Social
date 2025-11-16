@@ -123,14 +123,15 @@ function Homepage() {
     // ---------- Sentiment รายละเอียด (มาจาก Sentiment.jsx) ----------
     const mappedSentiment = useMemo(() =>
         filtered.map((r, i) => {
-            const topics = parseTopics(r);
             return {
                 id: r.id ?? i,
                 tweetId: r.tweetId || "",
                 faculty: r.faculty || "UNKNOWN",
                 sentiment: normSent(r.sentimentLabel),
+                final_label: r.finalLabel || "-",   // ⭐ เพิ่มตรงนี้
+    
                 date: pickDate(r),
-                topics,
+                topics: r.text ? [r.text] : ["-"],
                 source: r.source || "X",
                 nsfw: r.nsfw ? "Yes" : "No",
                 toxic: r.toxic ? "Yes" : "No",
@@ -140,6 +141,8 @@ function Homepage() {
             };
         }), [filtered]
     );
+    
+    
 
     const exportCSV = () => {
         const flat = mappedSentiment.map((m) => ({
@@ -273,7 +276,7 @@ function Homepage() {
                 </section>
 
                 {/* Chart */}
-                <main className="widgets-grid">
+                <main className="homepage-widgets">
                     <SentimentOverview data={sentimentData} loading={loading} error={err} />
                     <MentionsTrend data={trend} loading={loading} error={err} />
                     <MetricsRow total={total} loading={loading} />
@@ -292,10 +295,8 @@ function Homepage() {
                                 <div>Faculty</div>
                                 <div>Sentiment</div>
                                 <div>Source</div>
-                                <div>NSFW</div>
-                                <div>Toxic</div>
-                                <div>Analyzed At</div>
-                                <div>Link</div>
+                                <div>เดียวเอา final_labelมาใส่</div>
+                                 
                             </div>
                             {mappedSentiment.map((m) => (
                                 <div className="t-row" key={m.id}>
