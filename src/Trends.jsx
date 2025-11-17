@@ -25,7 +25,7 @@ const parseTopics = (r) => {
     return str.split(",").map((s) => s.trim()).filter(Boolean);
 };
 
-// ตัดคำแบบง่ายสำหรับกรณีไม่มี topics: ดึงจาก text แล้วตัด stopwords
+// STOP Words
 const STOP = new Set([
     "the","a","an","of","and","or","to","in","on","for","with","at","by","is","are","am",
     "ค่ะ","คะ","ครับ","และ","หรือ","ที่","ว่า","เป็น","มี","ให้","ได้","ไป","มา","แล้ว","เลย","ก็","อยู่","เรา","คุณ","เขา","จาก","ถึง","กับ","ใน","บน","ของ","ว่า",
@@ -39,12 +39,32 @@ const tokenizeText = (t="") =>
         .filter((w) => w.length > 1 && !STOP.has(w));
 
 export default function Trends() {
+
     // ดึงข้อมูลจริง
     const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
     const rows = data || [];
 
-    // ค้นหา
+    // ค้นหาโพสต์
     const [q, setQ] = useState("");
+
+    /* -------------------------------------
+       ★ CUSTOM KEYWORDS (React State)
+    ------------------------------------- */
+    const [word, setWord] = useState("");
+    const [label, setLabel] = useState("negative");
+
+    const addKeyword = async () => {
+        if (!word.trim()) return alert("กรุณาใส่คำก่อน");
+
+        await fetch("http://localhost:8082/custom-keywords/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keyword: word, sentiment: label }),
+        });
+
+        alert("เพิ่มคำสำเร็จ");
+        setWord("");
+    };
 
     // ===== สร้าง Top Keywords =====
     const { keywordsTop10, totalMentions } = useMemo(() => {
@@ -76,10 +96,9 @@ export default function Trends() {
     }, [rows]);
 
     // ===== Trending Posts =====
-    // นิยาม: โพสต์ที่มีคีย์เวิร์ดยอดฮิต (จาก top10) และใหม่สุดของแต่ละคีย์เวิร์ด
     const trendingPosts = useMemo(() => {
         const topSet = new Set(keywordsTop10.map((x) => x.keyword));
-        const pickedByKey = new Map(); // keyword -> row ล่าสุด
+        const pickedByKey = new Map();
 
         for (const r of rows) {
             const ts = parseTopics(r);
@@ -114,7 +133,6 @@ export default function Trends() {
             .sort((a, b) => String(b.date).localeCompare(String(a.date)))
             .slice(0, 10);
 
-        // fallback: ถ้าไม่มีเลย ให้หยิบ 5 รายการล่าสุด
         if (list.length === 0) {
             return [...rows]
                 .sort((a, b) => String(pickDate(b)).localeCompare(String(pickDate(a))))
@@ -133,19 +151,19 @@ export default function Trends() {
         return list;
     }, [rows, keywordsTop10]);
 
-    // กรองค้นหาในตาราง trending
+    // FILTER
     const filteredTrending = useMemo(() => {
         const qq = q.trim().toLowerCase();
         if (!qq) return trendingPosts;
         return trendingPosts.filter(
-            (p) =>
-                `${p.title} ${p.source}`.toLowerCase().includes(qq)
+            (p) => `${p.title} ${p.source}`.toLowerCase().includes(qq)
         );
     }, [q, trendingPosts]);
 
     return (
         <div className="trends-layout">
-            {/* Sidebar ให้เหมือนทุกหน้า */}
+
+            {/* Sidebar */}
             <aside className="sidebar">
                 <div className="logo-container">
                     <img
@@ -163,7 +181,6 @@ export default function Trends() {
                     <Link to="/mentions" className="nav-item">
                         <i className="fas fa-comment-dots"></i><span>Mentions</span>
                     </Link>
-                     
                     <Link to="/trends" className="nav-item active">
                         <i className="fas fa-stream"></i><span>Trends</span>
                     </Link>
@@ -183,38 +200,39 @@ export default function Trends() {
                 </header>
 
                 <div className="content-wrap">
-                    {/* Top Keywords */}
-                    <section className="card">
-                        <div className="card-head">
-                            <h3 className="widget-title">Top Keywords</h3>
-                        </div>
-
-                        {loading ? (
-                            <div className="placeholder">กำลังโหลด...</div>
-                        ) : keywordsTop10.length === 0 ? (
-                            <div className="placeholder">ไม่มีข้อมูล</div>
-                        ) : (
-                            <div className="keywords-grid">
-                                {keywordsTop10.map((k) => (
-                                    <div key={k.keyword} className="kw-chip" title={`${k.keyword} · ${k.count}`}>
-                                        <div className="kw-word">{k.keyword}</div>
-                                        <div className="kw-count">{k.count}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
 
                     {/* Trending Posts */}
                     <section className="card">
                         <div className="card-head">
                             <h3 className="widget-title">Trending Posts</h3>
+
+                            {/* Search */}
                             <input
                                 className="search"
                                 placeholder="🔍 ค้นหาโพสต์"
                                 value={q}
                                 onChange={(e) => setQ(e.target.value)}
                             />
+
+                            {/* ★ Custom Keyword Form */}
+                            <div className="custom-add-box">
+                                <input
+                                    value={word}
+                                    onChange={(e) => setWord(e.target.value)}
+                                    placeholder="เพิ่มคำเพื่อใช้ในการประมวลผล Sentiment"
+                                />
+
+                                <select 
+                                    value={label}
+                                    onChange={(e) => setLabel(e.target.value)}
+                                >
+                                    <option value="positive">positive</option>
+                                    <option value="neutral">neutral</option>
+                                    <option value="negative">negative</option>
+                                </select>
+
+                                <button onClick={addKeyword}>เพิ่มคำ</button>
+                            </div>
                         </div>
 
                         {err && (
@@ -234,7 +252,7 @@ export default function Trends() {
 
                                 {filteredTrending.map((p) => (
                                     <div className="t-row" key={p.id}>
-                                        <div className="title-cell" title={p.title}>{p.title}</div>
+                                        <div className="title-cell">{p.title}</div>
                                         <div>{p.date || "-"}</div>
                                         <div>{p.source}</div>
                                         <div>

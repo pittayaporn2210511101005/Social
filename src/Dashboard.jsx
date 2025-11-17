@@ -258,7 +258,7 @@ export default function Dashboard() {
 
                     {/* -------- Row 3 (Latest Mentions) -------- */}
                     <div className="widget-card widget-latest">
-                        <h3 className="widget-title">Top 5 Positive & Negative Mentions เดี๋ยวแก้ต่อให้เพิ่มตรงคะแนน </h3>
+                        <h3 className="widget-title">latest 5 Positive & Negative Mentions  </h3>
 
                         <div className="table">
                             <div className="t-head">
