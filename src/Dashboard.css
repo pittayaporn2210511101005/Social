@@ -7,13 +7,12 @@
     background: var(--card-bg);
 }
 
-/* -------- Sidebar -------- */
-.sidebar {
-    width: 250px;
+.sidebar { /*แถบม่วง*/
+    flex: 0 0 240px;
     background: var(--primary-color);
     padding: 30px 20px;
     color: #fff;
-}
+  }
 
 .logo-container {
     font-weight: bold;

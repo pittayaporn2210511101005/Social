@@ -19,14 +19,14 @@ html, body ,#root{
     height: 100%;
     overflow: hidden;/*ซ่อนสิ่งที่ล้นออกมา*/
 }
-.sidebar{/*แถบม่วง*/
-    width: 250px;
-    background-color: var(--primary-color);
-    color: var(--light-text);
-    padding: 30px 20px;
-    display: flex;
-    flex-direction: column;
+.sidebar { /*แถบม่วง*/
+  flex: 0 0 240px;
+  background: var(--primary-color);
+  padding: 30px 20px;
+  color: #fff;
 }
+
+
 .logo-container{
     font-weight: bold;
     margin-bottom: 40px;
@@ -68,17 +68,24 @@ html, body ,#root{
 .main-content{
     flex-grow:1;
     height: 100%;
-
     padding: 30px;
     overflow-y:auto;
     background-color: var(--card-bg);
 }
+/*หัวสุด*/
 .main-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-  }
+  position: relative;
+  background: var(--bg);
+  padding-bottom: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  z-index: 50;
+}
+
+
 
   .header-title {
     font-size: 2rem;
@@ -138,6 +145,78 @@ html, body ,#root{
     color: var(--dark-text);
   }
 
+  /* ============================= */
+/* ⭐ MENTION TRENDS GRAPH STYLE */
+/* ============================= */
+
+.mentions-wrapper {
+  background: var(--card);
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.mentions-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--text);
+  margin-bottom: 15px;
+}
+
+.mentions-chart-container {
+  background: #fafafa;
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 15px;
+  overflow-x: auto;
+}
+
+/* เมื่อไม่มีข้อมูล */
+.mentions-empty {
+  padding: 50px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 1rem;
+}
+
+/* จุดบนเส้นกราฟ */
+.trend-dot {
+  fill: #6d28d9;
+  stroke: #1d4ed8;
+  stroke-width: 2px;
+}
+
+/* ตารางด้านล่าง */
+.mentions-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.mentions-table thead {
+  background: #f1f5f9;
+}
+
+.mentions-table th {
+  padding: 8px;
+  text-align: left;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mentions-table td {
+  padding: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mentions-table tr:hover {
+  background: #eef2ff;
+}
+
+
   .chart-placeholder {
     display: flex;
     align-items: center;
@@ -178,15 +257,13 @@ html, body ,#root{
     align-items: baseline;
     justify-content: space-between;
   }
+  
 
 /* Sticky filter bar */
 .filters-sticky {
-    position: sticky;
-    top: 64px; /* ใต้หัวข้อหลัก */
-    z-index: 5;
-    background: #f8fafc;
-    padding-top: 6px;
-    margin-bottom: 8px;
+  position: sticky; /* หรือ static ตามที่ใช้ */
+    top: 0;
+    z-index: 10; /* 👈 ลดลง เพื่อไม่ทับ header */
 }
 
 /* Header toolbar */
@@ -225,7 +302,7 @@ html, body ,#root{
 
 /* Table ใน MentionsTable (เผื่อยังไม่ได้สไตล์) */
 .table .t-head, .table .t-row {
-    grid-template-columns: 2.4fr 1fr 1fr 1fr .9fr !important;
+  grid-template-columns: 0.8fr 2.8fr 1.8fr 1.2fr 1fr 1fr;
 }
 
 
@@ -267,4 +344,10 @@ body { background: var(--bg); color: var(--text); }
 
 /* ตาราง/อินพุตพื้นฐาน */
 .input, .select { background: var(--card); color: var(--text); border:1px solid var(--border); }
+
+.sentiment-select {
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
 

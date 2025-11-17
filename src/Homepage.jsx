@@ -1,164 +1,202 @@
-// src/Homepage.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import "./Homepage.css";
 import { Link } from "react-router-dom";
 
-// API และ hook
+// API
 import { getTweetAnalysis } from "./services/api";
 import { useFetch } from "./hooks/useFetch";
 
-// components เดิม
+// components
 import FiltersBar from "./components/FiltersBar";
 import SentimentOverview from "./components/SentimentOverview";
 import MentionsTrend from "./components/MentionsTrend";
 import MetricsRow from "./components/MetricsRow";
-import MentionsTable from "./components/MentionsTable";
-import { downloadCSV } from "./utils/csv";
 
-/* ===== helper จาก Sentiment.jsx ===== */
+// Excel libraries
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
+/* ========== HELPERS =========== */
 const normSent = (s = "") => {
     const x = s.toLowerCase();
     if (x === "pos" || x === "positive") return "positive";
     if (x === "neg" || x === "negative") return "negative";
     return "neutral";
 };
-const pickDate = (r) =>
-    (r.analyzedAt || r.createdAt || r.crawlTime || "").toString().slice(0, 10);
-const parseTopics = (r) => {
-    if (Array.isArray(r.topics) && r.topics.length) return r.topics;
-    const tj = r.topicsJson;
-    if (!tj) return [];
-    const str = String(tj).trim();
-    if (str.startsWith("[") || str.startsWith("{")) {
-        try {
-            const arr = JSON.parse(str);
-            if (Array.isArray(arr)) return arr.map(String);
-        } catch (_) { }
-    }
-    return str.split(",").map((s) => s.trim()).filter(Boolean);
-};
-function SentimentBadge({ value }) {
-    const v = (value || "").toLowerCase();
-    const cls =
-        v === "positive"
-            ? "pill pill-pos"
-            : v === "negative"
-                ? "pill pill-neg"
-                : "pill pill-neu";
-    return <span className={cls}>{v || "-"}</span>;
-}
 
+const pickDate = (r) =>
+    (r.analyzedAt || r.createdAt || r.crawlTime || "")
+        .toString()
+        .slice(0, 10);
+
+// Normalize คณะ
+const normalizeFaculty = (f = "") => {
+    if (!f) return "มหาวิทยาลัยโดยรวม";
+
+    const x = f.replace(/\s+/g, "").toLowerCase();
+
+    if (x.includes("บัญชี")) return "บัญชี";
+    if (x.includes("บริการ")) return "ศูนย์บริการ";
+    if (x.includes("นิเทศ")) return "นิเทศศาสตร์";
+    if (x.includes("บริหาร") || x.includes("จัดการ") || x.includes("ธุรกิจ"))
+        return "บริหารธุรกิจ";
+    if (x.includes("มหาวิทยาลัย") || x.includes("utcc"))
+        return "มหาวิทยาลัยโดยรวม";
+    if (x.includes("วิทยา") || x.includes("วิทย์")) return "วิทยาศาสตร์";
+    if (x.includes("มนุษ")) return "มนุษย์ศาสตร์";
+    if (x.includes("ตลาด")) return "การตลาด";
+    if (x.includes("ทุน")) return "ทุนมหาลัย";
+    if (x.includes("เศรษ")) return "เศรษฐศาสตร์";
+    if (x.includes("โลจิส")) return "โลจิสติกส์";
+    if (x.includes("กยศ") || x.includes("กยส")) return "กยส";
+
+    return "มหาวิทยาลัยโดยรวม";
+};
+
+/* ========== MAIN COMPONENT =========== */
 function Homepage() {
-    // ---------- state ----------
-    const [page, setPage] = useState(1);
-    const pageSize = 10;
     const [q, setQ] = useState("");
     const [faculty, setFaculty] = useState("ทั้งหมด");
     const [sent, setSent] = useState("ทั้งหมด");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
 
-    const faculties = useMemo(
-        () => [
-            "ทั้งหมด",
-            "คณะบริหารธุรกิจ",
-            "คณะวิทยาศาสตร์ฯ (CS)",
-            "คณะนิติศาสตร์",
-            "คณะบัญชี",
-            "บริการ/สิ่งอำนวยความสะดวก",
-        ],
-        []
-    );
+    const faculties = [
+        "ทั้งหมด",
+        "บริหารธุรกิจ",
+        "วิทยาศาสตร์",
+        "นิติศาสตร์",
+        "บัญชี",
+        "ท่องเที่ยว",
+        "เศรษฐศาสตร์",
+        "โลจิสติกส์",
+        "มนุษย์ศาสตร์",
+        "การตลาด",
+        "ทุนมหาลัย",
+        "กยส",
+        "ศูนย์บริการ",
+        "มหาวิทยาลัยโดยรวม",
+    ];
 
-    const { data, loading, err } = useFetch(() => getTweetAnalysis(), []);
-    const rows = data || [];
+    /* --- LOAD DATA --- */
+    const { data, loading } = useFetch(() => getTweetAnalysis(), []);
+    const [rows, setRows] = useState([]);
 
-    // ---------- filter ----------
+    useEffect(() => {
+        setRows(data || []);
+    }, [data]);
+
+    /* --- UPDATE SENTIMENT --- */
+    const updateSentiment = async (id, newValue) => {
+        try {
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === id ? { ...r, sentimentLabel: newValue } : r
+                )
+            );
+
+            await fetch(`http://localhost:8082/api/sentiment/update/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sentiment: newValue }),
+            });
+        } catch (e) {
+            console.error(e);
+            alert("อัปเดตไม่สำเร็จ");
+        }
+    };
+
+    /* --- FILTER --- */
     const filtered = useMemo(() => {
-        const qq = q.trim().toLowerCase();
-        const fromD = from ? new Date(from) : null;
-        const toD = to ? new Date(to) : null;
-
         return rows.filter((r) => {
-            const fac = (r.faculty || "").trim();
+            const facNorm = normalizeFaculty(r.faculty);
             const s = normSent(r.sentimentLabel);
-            const dayStr = pickDate(r);
-            const day = dayStr ? new Date(dayStr) : null;
+            const day = new Date(pickDate(r));
 
-            if (faculty !== "ทั้งหมด" && fac !== faculty) return false;
+            if (faculty !== "ทั้งหมด" && facNorm !== faculty) return false;
             if (sent !== "ทั้งหมด" && s !== sent) return false;
-            if (fromD && day && day < fromD) return false;
-            if (toD && day && day > toD) return false;
 
-            if (!qq) return true;
-            const topics = parseTopics(r).join(" ");
-            const hay = `${topics} ${r.faculty || ""} ${r.sentimentLabel || ""} ${r.tweetId || ""
-                } ${r.text || ""}`;
-            return hay.toLowerCase().includes(qq);
+            if (from && day < new Date(from)) return false;
+            if (to && day > new Date(to)) return false;
+
+            if (q) {
+                const text = `${r.text} ${r.faculty}`.toLowerCase();
+                if (!text.includes(q.toLowerCase())) return false;
+            }
+
+            return true;
         });
     }, [rows, q, faculty, sent, from, to]);
 
-    // ---------- summary ----------
+    /* --- SUMMARY --- */
     const total = filtered.length;
-    const { pos, neu, neg } = useMemo(() => {
-        let p = 0, n = 0, g = 0;
-        for (const r of filtered) {
-            const s = normSent(r.sentimentLabel);
-            if (s === "positive") p++;
-            else if (s === "negative") g++;
-            else n++;
-        }
-        return { pos: p, neu: n, neg: g };
+    let pos = 0,
+        neg = 0,
+        neu = 0;
+    filtered.forEach((r) => {
+        const s = normSent(r.sentimentLabel);
+        if (s === "positive") pos++;
+        else if (s === "negative") neg++;
+        else neu++;
+    });
+
+    /* --- TRENDS DATA --- */
+    const trendData = useMemo(() => {
+        const counter = {};
+
+        filtered.forEach((r) => {
+            const d = pickDate(r);
+            if (!d) return;
+            if (!counter[d]) counter[d] = 0;
+            counter[d]++;
+        });
+
+        return Object.entries(counter).map(([date, count]) => ({
+            date,
+            count,
+        }));
     }, [filtered]);
 
-    const sentimentData = useMemo(
-        () => [
-            { name: "Positive", value: pos },
-            { name: "Neutral", value: neu },
-            { name: "Negative", value: neg },
-        ],
-        [pos, neu, neg]
-    );
-
-    // ---------- Sentiment รายละเอียด (มาจาก Sentiment.jsx) ----------
-    const mappedSentiment = useMemo(() =>
-        filtered.map((r, i) => {
-            return {
-                id: r.id ?? i,
-                tweetId: r.tweetId || "",
-                faculty: r.faculty || "UNKNOWN",
-                sentiment: normSent(r.sentimentLabel),
-                final_label: r.finalLabel || "-",   // ⭐ เพิ่มตรงนี้
-    
-                date: pickDate(r),
-                topics: r.text ? [r.text] : ["-"],
-                source: r.source || "X",
-                nsfw: r.nsfw ? "Yes" : "No",
-                toxic: r.toxic ? "Yes" : "No",
-                url: r.tweetId
-                    ? `https://x.com/i/web/status/${r.tweetId}`
-                    : "#",
-            };
-        }), [filtered]
-    );
-    
-    
-
-    const exportCSV = () => {
-        const flat = mappedSentiment.map((m) => ({
-            id: m.id,
-            tweetId: m.tweetId,
-            faculty: m.faculty,
-            sentiment: m.sentiment,
-            analyzedAt: m.date,
-            topics: m.topics.join(" | "),
-            source: m.source,
-            nsfw: m.nsfw,
-            toxic: m.toxic,
-            url: m.url,
+    /* --- EXPORT EXCEL --- */
+    const exportExcel = () => {
+        const flat = filtered.map((r) => ({
+            ID: r.id,
+            Topics: r.text,
+            Faculty: normalizeFaculty(r.faculty),
+            Sentiment: normSent(r.sentimentLabel),
+            Source: r.source,
+            Date: pickDate(r),
+            Link: r.tweetId
+                ? `https://x.com/i/web/status/${r.tweetId}`
+                : "-",
         }));
-        downloadCSV(flat, "sentiment_report.csv");
+
+        const ws = XLSX.utils.json_to_sheet(flat);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Sentiment");
+
+        const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+        saveAs(
+            new Blob([excelBuffer], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            }),
+            "sentiment_report.xlsx"
+        );
     };
+
+    /* --- TABLE DATA --- */
+    const mappedSentiment = filtered.map((r) => ({
+        id: r.id,
+        topics: r.text,
+        faculty: normalizeFaculty(r.faculty),
+        sentiment: normSent(r.sentimentLabel),
+        source: r.source,
+        date: pickDate(r),
+        url: r.tweetId
+            ? `https://x.com/i/web/status/${r.tweetId}`
+            : "-",
+    }));
 
     const resetFilters = () => {
         setQ("");
@@ -166,22 +204,9 @@ function Homepage() {
         setSent("ทั้งหมด");
         setFrom("");
         setTo("");
-        setPage(1);
     };
 
-    // ---------- trend ----------
-    const trend = useMemo(() => {
-        const byDay = new Map();
-        for (const r of filtered) {
-            const d = pickDate(r);
-            if (!d) continue;
-            byDay.set(d, (byDay.get(d) || 0) + 1);
-        }
-        return Array.from(byDay.entries())
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([date, count]) => ({ date, count }));
-    }, [filtered]);
-
+    /* --- UI --- */
     return (
         <div className="homepage-container">
             {/* Sidebar */}
@@ -198,50 +223,39 @@ function Homepage() {
 
                 <nav className="nav-menu">
                     <Link to="/dashboard" className="nav-item">
-                        <i className="far fa-chart-line"></i>
                         <span>Dashboard</span>
                     </Link>
                     <Link to="/mentions" className="nav-item active">
-                        <i className="fas fa-comment-dots"></i>
                         <span>Mentions</span>
                     </Link>
-                     
                     <Link to="/trends" className="nav-item">
-                        <i className="fas fa-stream"></i>
                         <span>Trends</span>
                     </Link>
                     <Link to="/settings" className="nav-item">
-                        <i className="fas fa-cog"></i>
                         <span>Settings</span>
                     </Link>
                 </nav>
             </div>
 
-            {/* Main Content */}
+            {/* Main */}
             <div className="main-content">
                 <header className="main-header">
                     <div className="header-left">
-                        <h1 className="header-title">Mentions & Sentiment</h1>
-                        <div className="subhead">
-                            ผลลัพธ์ทั้งหมด <b>{total.toLocaleString()}</b> รายการ
-                        </div>
+                        <h1>Mentions & Sentiment</h1>
+                        <div>ผลลัพธ์ทั้งหมด <b>{total}</b> รายการ</div>
                     </div>
+
                     <div className="header-right">
-                        <div className="toolbar">
-                            <button className="btn ghost" onClick={resetFilters}>
-                                รีเซ็ตตัวกรอง
-                            </button>
-                            <button className="btn primary" onClick={exportCSV}>
-                                Export CSV
-                            </button>
-                        </div>
-                        <div className="profile-icon">
-                            <i className="fas fa-user-circle"></i>
-                        </div>
+                        <button className="btn ghost" onClick={resetFilters}>
+                            รีเซ็ตตัวกรอง
+                        </button>
+
+                        <button className="btn primary" onClick={exportExcel}>
+                            Export Excel
+                        </button>
                     </div>
                 </header>
 
-                {/* Filter */}
                 <div className="filters-sticky">
                     <FiltersBar
                         q={q}
@@ -265,26 +279,29 @@ function Homepage() {
                         <div className="kpi-title">Positive</div>
                         <div className="kpi-value">{pos}</div>
                     </div>
+
                     <div className="kpi-card neu">
                         <div className="kpi-title">Neutral</div>
                         <div className="kpi-value">{neu}</div>
                     </div>
+
                     <div className="kpi-card neg">
                         <div className="kpi-title">Negative</div>
                         <div className="kpi-value">{neg}</div>
                     </div>
                 </section>
 
-                {/* Chart */}
                 <main className="homepage-widgets">
-                    <SentimentOverview data={sentimentData} loading={loading} error={err} />
-                    <MentionsTrend data={trend} loading={loading} error={err} />
-                    <MetricsRow total={total} loading={loading} />
+                    
+                    <SentimentOverview data={[pos, neu, neg]} />
+                    <MentionsTrend data={trendData} />
+                    <MetricsRow total={total} />
                 </main>
 
-                {/* ===== ส่วนของหน้า Sentiment เพิ่มเข้ามา ===== */}
+                {/* Table */}
                 <section className="card">
-                    <h3 className="widget-title">รายการโพสต์ตาม Sentiment ({total})</h3>
+                    <h3>รายการโพสต์ตาม Sentiment ({total})</h3>
+
                     {loading ? (
                         <div className="placeholder">กำลังโหลด...</div>
                     ) : (
@@ -295,31 +312,45 @@ function Homepage() {
                                 <div>Faculty</div>
                                 <div>Sentiment</div>
                                 <div>Source</div>
-                                <div>เดียวเอา final_labelมาใส่</div>
-                                 
+                                <div>Date</div>
+                                <div>Link</div>
                             </div>
+
                             {mappedSentiment.map((m) => (
                                 <div className="t-row" key={m.id}>
                                     <div>{m.id}</div>
-                                    <div className="topics" title={m.topics.join(", ")}>
-                                        {m.topics.length ? m.topics.join(", ") : "-"}
-                                    </div>
+                                    <div>{m.topics}</div>
                                     <div>{m.faculty}</div>
-                                    <div><SentimentBadge value={m.sentiment} /></div>
-                                    <div>{m.source}</div>
-                                    <div className={m.nsfw === "Yes" ? "flag bad" : "flag ok"}>{m.nsfw}</div>
-                                    <div className={m.toxic === "Yes" ? "flag bad" : "flag ok"}>{m.toxic}</div>
-                                    <div>{m.date || "-"}</div>
+
                                     <div>
-                                        {m.url && m.url !== "#" ? (
-                                            <a className="link" href={m.url} target="_blank" rel="noreferrer">เปิดลิงก์</a>
-                                        ) : "-"}
+                                        <select
+                                            value={m.sentiment}
+                                            onChange={(e) =>
+                                                updateSentiment(m.id, e.target.value)
+                                            }
+                                        >
+                                            <option value="positive">positive</option>
+                                            <option value="neutral">neutral</option>
+                                            <option value="negative">negative</option>
+                                        </select>
+                                    </div>
+
+                                    <div>{m.source}</div>
+                                    <div>{m.date}</div>
+
+                                    <div>
+                                        {m.url !== "-" ? (
+                                            <a href={m.url} target="_blank">เปิดลิงก์</a>
+                                        ) : (
+                                            "-"
+                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </section>
+
             </div>
         </div>
     );
