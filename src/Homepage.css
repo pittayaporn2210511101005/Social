@@ -261,9 +261,10 @@ html, body ,#root{
 
 /* Sticky filter bar */
 .filters-sticky {
-  position: sticky; /* หรือ static ตามที่ใช้ */
-    top: 0;
-    z-index: 10; /* 👈 ลดลง เพื่อไม่ทับ header */
+   
+    top: 70px;
+    background: var(--bg);
+    z-index: 10;
 }
 
 /* Header toolbar */

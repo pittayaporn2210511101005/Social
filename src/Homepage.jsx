@@ -83,7 +83,7 @@ function Homepage() {
     const [rows, setRows] = useState([]);
 
     useEffect(() => {
-        setRows(data || []);
+        if (data) setRows(data);
     }, [data]);
 
     /* --- UPDATE SENTIMENT --- */
@@ -133,6 +133,7 @@ function Homepage() {
     let pos = 0,
         neg = 0,
         neu = 0;
+
     filtered.forEach((r) => {
         const s = normSent(r.sentimentLabel);
         if (s === "positive") pos++;
@@ -175,7 +176,10 @@ function Homepage() {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Sentiment");
 
-        const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const excelBuffer = XLSX.write(wb, {
+            bookType: "xlsx",
+            type: "array",
+        });
 
         saveAs(
             new Blob([excelBuffer], {
@@ -291,9 +295,15 @@ function Homepage() {
                     </div>
                 </section>
 
+                {/* Widgets */}
                 <main className="homepage-widgets">
-                    
-                    <SentimentOverview data={[pos, neu, neg]} />
+                <SentimentOverview
+                    data={[
+                        { name: "Positive", value: pos },
+                        { name: "Neutral", value: neu },
+                        { name: "Negative", value: neg }
+                    ]}
+                    />
                     <MentionsTrend data={trendData} />
                     <MetricsRow total={total} />
                 </main>
@@ -316,8 +326,8 @@ function Homepage() {
                                 <div>Link</div>
                             </div>
 
-                            {mappedSentiment.map((m) => (
-                                <div className="t-row" key={m.id}>
+                            {mappedSentiment.map((m, index) => (
+                                <div className="t-row" key={`${m.id}-${index}`}>
                                     <div>{m.id}</div>
                                     <div>{m.topics}</div>
                                     <div>{m.faculty}</div>
@@ -350,7 +360,6 @@ function Homepage() {
                         </div>
                     )}
                 </section>
-
             </div>
         </div>
     );
