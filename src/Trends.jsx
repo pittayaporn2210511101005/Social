@@ -47,9 +47,7 @@ export default function Trends() {
     // ค้นหาโพสต์
     const [q, setQ] = useState("");
 
-    /* -------------------------------------
-       ★ CUSTOM KEYWORDS (React State)
-    ------------------------------------- */
+    /* ---------- CUSTOM KEYWORDS ---------- */
     const [word, setWord] = useState("");
     const [label, setLabel] = useState("negative");
 
@@ -65,6 +63,40 @@ export default function Trends() {
         alert("เพิ่มคำสำเร็จ");
         setWord("");
     };
+
+    // ===== Pantip Temp Mode =====
+    const [pantipKeyword, setPantipKeyword] = useState("");
+    const [tempPantipPosts, setTempPantipPosts] = useState([]);
+    const [tempMode, setTempMode] = useState(false);
+
+    async function fetchPantipTemp() {
+        if (!pantipKeyword.trim()) {
+            alert("กรุณาใส่คำค้นหา Pantip");
+            return;
+        }
+
+        const res = await fetch(
+            "http://localhost:8082/pantip/temp-fetch?keyword=" + encodeURIComponent(pantipKeyword)
+        );
+
+        const data = await res.json();
+        setTempPantipPosts(data);
+        setTempMode(true);
+    }
+
+    async function savePantipTemp() {
+        await fetch("http://localhost:8082/pantip/save-temp", { method: "POST" });
+        alert("บันทึกและวิเคราะห์สำเร็จ!");
+        setTempPantipPosts([]);
+        setTempMode(false);
+    }
+
+    async function cancelPantipTemp() {
+        await fetch("http://localhost:8082/pantip/clear-temp", { method: "POST" });
+        alert("ยกเลิกแล้ว ข้อมูลจะไม่ถูกบันทึก");
+        setTempPantipPosts([]);
+        setTempMode(false);
+    }
 
     // ===== สร้าง Top Keywords =====
     const { keywordsTop10, totalMentions } = useMemo(() => {
@@ -200,6 +232,116 @@ export default function Trends() {
                 </header>
 
                 <div className="content-wrap">
+
+                    {/* ================= Pantip Fetch Section ================ */}
+                    <section className="card" style={{ marginBottom: "20px" }}>
+                        <h3 className="widget-title" style={{ marginBottom: "10px" }}>
+                            ดึงข้อมูลจาก Pantip (โหมดทดลอง)
+                        </h3>
+
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                            <input
+                                value={pantipKeyword}
+                                onChange={(e) => setPantipKeyword(e.target.value)}
+                                placeholder="พิมพ์คำค้นหา Pantip เช่น หอการค้า"
+                                style={{
+                                    flex: "1",
+                                    minWidth: "260px",
+                                    padding: "8px 10px",
+                                    border: "1px solid #cbd5e1",
+                                    borderRadius: "10px",
+                                }}
+                            />
+
+                            <button
+                                onClick={fetchPantipTemp}
+                                style={{
+                                    padding: "8px 16px",
+                                    background: "#2563eb",
+                                    color: "white",
+                                    borderRadius: "10px",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: "600",
+                                }}
+                            >
+                                ค้นหา Pantip
+                            </button>
+                        </div>
+
+                        {/* แสดงผล TEMP */}
+                        {tempMode && (
+                            <div style={{ marginTop: "20px" }}>
+                                <h4 style={{ marginBottom: "10px" }}>
+                                    📌 ผลการดึงข้อมูลแบบยังไม่บันทึก (Preview)
+                                </h4>
+
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: "10px",
+                                        marginBottom: "12px",
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <button
+                                        onClick={savePantipTemp}
+                                        style={{
+                                            padding: "8px 14px",
+                                            background: "#16a34a",
+                                            color: "white",
+                                            borderRadius: "10px",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            fontWeight: "600",
+                                        }}
+                                    >
+                                        ✔ วิเคราะห์ / บันทึก
+                                    </button>
+
+                                    <button
+                                        onClick={cancelPantipTemp}
+                                        style={{
+                                            padding: "8px 14px",
+                                            background: "#dc2626",
+                                            color: "white",
+                                            borderRadius: "10px",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            fontWeight: "600",
+                                        }}
+                                    >
+                                        ✖ ยกเลิก
+                                    </button>
+                                </div>
+
+                                {/* รายการโพสต์ TEMP */}
+                                <div style={{ maxHeight: "260px", overflowY: "auto" }}>
+                                    {tempPantipPosts.length === 0 ? (
+                                        <div>ไม่มีข้อมูล</div>
+                                    ) : (
+                                        tempPantipPosts.map((p, i) => (
+                                            <div
+                                                key={i}
+                                                style={{
+                                                    padding: "10px",
+                                                    borderBottom: "1px solid #e2e8f0",
+                                                }}
+                                            >
+                                                <div style={{ fontWeight: "700", color: "#0f172a" }}>
+                                                    {p.title}
+                                                </div>
+                                                <div style={{ fontSize: "14px", color: "#475569" }}>
+                                                    {p.preview || p.content?.slice(0, 100)}...
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                    {/* ================= END Pantip Section ================ */}
 
                     {/* Trending Posts */}
                     <section className="card">
